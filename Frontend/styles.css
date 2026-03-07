@@ -30,6 +30,16 @@ body {
   position: relative;
 }
 
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
 h1,
 h2,
 h3 {
@@ -455,6 +465,22 @@ p {
 .leaderboard-table tbody tr.self {
   background: rgba(135, 8, 42, 0.16);
   font-weight: 700;
+}
+
+.site-footer {
+  background: rgba(150, 0, 24, 0.95);
+  margin-top: auto;
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem) 1.05rem;
+  text-align: center;
+}
+
+.site-footer p {
+  color: rgba(244, 249, 233, 0.96);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding-top: 0.75rem;
+  text-transform: lowercase;
 }
 
 @keyframes rise {
