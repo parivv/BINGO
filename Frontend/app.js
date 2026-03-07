@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   user: "bingo-battles.user",
   boards: "bingo-battles.boards"
 };
+const BACKEND_ORIGIN = "http://localhost:5000";
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeLandingPage();
@@ -52,6 +53,7 @@ function initializeAuthPage() {
   const usernameInput = document.getElementById("usernameInput");
   const passwordInput = document.getElementById("passwordInput");
   const authError = document.getElementById("authError");
+  const googleAuthBtn = document.getElementById("googleAuthBtn");
 
   if (mode === "signup") {
     authEyebrow.textContent = "Create Account";
@@ -70,6 +72,10 @@ function initializeAuthPage() {
   forgotPasswordLink.addEventListener("click", (event) => {
     event.preventDefault();
     window.alert("Password reset is coming soon.");
+  });
+
+  googleAuthBtn?.addEventListener("click", () => {
+    window.location.href = `${BACKEND_ORIGIN}/auth/google`;
   });
 
   authForm.addEventListener("submit", (event) => {
@@ -100,13 +106,17 @@ function initializeAuthPage() {
   });
 }
 
-function initializeDashboardPage() {
+async function initializeDashboardPage() {
   const dashboardSection = document.getElementById("dashboardSection");
   if (!dashboardSection) {
     return;
   }
 
-  const user = getUser();
+  let user = getUser();
+  if (!user) {
+    user = await syncUserFromBackendSession();
+  }
+
   if (!user) {
     window.location.href = "index.html";
     return;
@@ -182,6 +192,10 @@ function initializeDashboardPage() {
   });
 
   signOutMenu.addEventListener("click", () => {
+    void fetch(`${BACKEND_ORIGIN}/auth/logout`, {
+      method: "POST",
+      credentials: "include"
+    });
     localStorage.removeItem(STORAGE_KEYS.user);
     window.location.href = "index.html";
   });
@@ -303,6 +317,31 @@ function initializeDashboardPage() {
 
     targetBoard.completed = Math.min(targetBoard.total, targetBoard.completed + 1);
     localStorage.setItem(STORAGE_KEYS.boards, JSON.stringify(boards));
+  }
+}
+
+async function syncUserFromBackendSession() {
+  try {
+    const response = await fetch(`${BACKEND_ORIGIN}/auth/me`, {
+      credentials: "include"
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json();
+    if (!payload?.authenticated || !payload?.user) {
+      return null;
+    }
+
+    const user = {
+      name: payload.user.name || payload.user.email || "Player"
+    };
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+    return user;
+  } catch (_error) {
+    return null;
   }
 }
 

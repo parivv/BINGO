@@ -196,6 +196,10 @@ p {
   margin-top: 0.5rem;
 }
 
+.auth-google-btn {
+  margin-top: 0.1rem;
+}
+
 .text-link {
   color: var(--accent);
   font-weight: 700;

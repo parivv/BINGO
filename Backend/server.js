@@ -3,7 +3,63 @@ const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-require("dotenv").config({ override: true });
+const fs = require("fs");
+const path = require("path");
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, ".env");
+  if (!fs.existsSync(envPath)) {
+    return;
+  }
+
+  const parseLines = (text) => {
+    const parsed = {};
+    const lines = text.split(/\r?\n/);
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex <= 0) {
+        continue;
+      }
+
+      const key = line.slice(0, separatorIndex).trim();
+      let value = line.slice(separatorIndex + 1).trim();
+
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      parsed[key] = value;
+    }
+
+    return parsed;
+  };
+
+  const rawBuffer = fs.readFileSync(envPath);
+  const utf8Text = rawBuffer.toString("utf8").replace(/^\uFEFF/, "");
+  let parsed = parseLines(utf8Text);
+
+  // Some editors on Windows save .env as UTF-16 LE, which can appear as UTF-8 with null bytes.
+  const hasNullBytes = utf8Text.includes("\u0000");
+  const hasCorruptKeys = Object.keys(parsed).some((key) => key.includes("\u0000"));
+  if (Object.keys(parsed).length === 0 || hasNullBytes || hasCorruptKeys) {
+    parsed = parseLines(rawBuffer.toString("utf16le").replace(/^\uFEFF/, ""));
+  }
+
+  for (const [key, value] of Object.entries(parsed)) {
+    process.env[key] = value;
+  }
+}
+
+loadEnvFile();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
