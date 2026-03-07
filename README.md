@@ -1,7 +1,7 @@
 # BINGO
 
 1. Install dependencies once:
-cd backend
+cd Backend
 npm install
 cd ..\Frontend
 npm install
@@ -12,4 +12,5 @@ npm run backend
 3. Open a new terminal:
 npm run start
 
-4. Open URL
+4. Open URL:
+http://localhost:5173

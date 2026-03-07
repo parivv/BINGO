@@ -1,59 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bingo Battles</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bungee:wght@400&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body class="landing-page">
-  <div class="ambient-bg" aria-hidden="true">
-    <span class="blob blob-a"></span>
-    <span class="blob blob-b"></span>
-    <span class="blob blob-c"></span>
-  </div>
-
-  <header class="topbar landing-topbar">
-    <a class="brand" href="index.html">Bingo Battles</a>
-    <nav class="auth-links" aria-label="Authentication links">
-      <button id="loginBtn" class="btn btn-outline" type="button">Log In</button>
-      <button id="signupBtn" class="btn btn-primary" type="button">Sign Up</button>
-    </nav>
-  </header>
-
-  <main class="landing-main">
-    <section class="hero" aria-labelledby="hero-title">
-      <p class="eyebrow">Build Momentum, Not Just Lists</p>
-      <h1 id="hero-title">Turn your goals into a BINGO challenge you actually finish.</h1>
-      <p class="hero-copy">
-        Bingo Battles helps you map your personal goals onto a board, track real progress, and stay motivated with friendly competition.
-        Complete squares, raise your percentage, and race your friends on the leaderboard.
-      </p>
-      <div class="hero-actions">
-        <button id="heroSignupBtn" class="btn btn-primary btn-lg" type="button">Start Your First Board</button>
-        <button id="heroLoginBtn" class="btn btn-ghost btn-lg" type="button">I Already Have an Account</button>
-      </div>
-    </section>
-
-    <section class="usage-panel" aria-labelledby="usage-title">
-      <h2 id="usage-title">How It Works</h2>
-      <ol>
-        <li>Create a board for your fitness, career, school, or life goals.</li>
-        <li>Mark completed goals and watch your completion percentage rise.</li>
-        <li>Join a group and compare progress on the leaderboard.</li>
-      </ol>
-      <div class="mini-preview" aria-hidden="true">
-        <div class="mini-cell done">Apply to job</div>
-        <div class="mini-cell">Read 4 books</div>
-        <div class="mini-cell done">Workout 20x</div>
-        <div class="mini-cell">Build portfolio</div>
-      </div>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bingo Battles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bungee:wght@400&family=Manrope:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
