@@ -1,6 +1,12 @@
 @import url("https://fonts.cdnfonts.com/css/volcanic-dungeon");
 @import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&display=swap");
 
+@font-face {
+  font-family: "CF Band of Brothers";
+  src: url("./cf-band-of-brothers-font/CfBandOfBrothersPersonalRegular-X3qY2.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   --font-body: "Baloo 2", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-display: "Luckiest Guy", "Bungee", Impact, sans-serif;
@@ -476,11 +482,19 @@ p {
 
 .site-footer p {
   color: rgba(244, 249, 233, 0.96);
+  font-family: "CF Band of Brothers", "Volcanic Dungeon", Impact, sans-serif;
   font-size: 0.9rem;
   letter-spacing: 0.04em;
   margin: 0;
   padding-top: 0.75rem;
   text-transform: lowercase;
+}
+
+.tm-symbol {
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", "Segoe UI", sans-serif;
+  font-size: 0.7em;
+  margin-left: 0.18em;
+  vertical-align: super;
 }
 
 @keyframes rise {

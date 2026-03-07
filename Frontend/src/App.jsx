@@ -89,7 +89,10 @@ function AmbientBackground() {
 function AppFooter() {
   return (
     <footer className="site-footer">
-      <p>dorm floor productions™</p>
+      <p>
+        dorm floor productions
+        <span className="tm-symbol">&trade;</span>
+      </p>
     </footer>
   );
 }
