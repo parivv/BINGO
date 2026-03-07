@@ -1,13 +1,13 @@
 :root {
-  --paper: #f6f2ea;
-  --ink: #1f2233;
-  --accent: #f26419;
-  --accent-deep: #cc4a09;
-  --mint: #37c6ab;
-  --sun: #f8c537;
-  --panel: #fff9f1;
-  --stroke: #1f22331f;
-  --shadow: 0 12px 30px rgba(31, 34, 51, 0.16);
+  --ink: #334e58;
+  --accent: #ce3760;
+  --accent-soft: #f7a278;
+  --mint: #3ba485;
+  --mint-soft: #91e0c0;
+  --paper: #f7a278;
+  --panel: rgba(255, 255, 255, 0.88);
+  --stroke: rgba(51, 78, 88, 0.2);
+  --shadow: 0 12px 30px rgba(51, 78, 88, 0.18);
 }
 
 * {
@@ -18,7 +18,9 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: "Manrope", "Segoe UI", sans-serif;
-  background: radial-gradient(circle at 10% 10%, #fff5de 0%, #f6f2ea 45%, #efe6d7 100%);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(247, 162, 120, 0.45) 0%, rgba(145, 224, 192, 0.42) 45%, rgba(59, 164, 133, 0.5) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.95));
   min-height: 100vh;
   position: relative;
 }
@@ -53,7 +55,7 @@ p {
 }
 
 .blob-a {
-  background: #f8c537;
+  background: var(--accent-soft);
   width: 340px;
   height: 340px;
   top: -90px;
@@ -61,7 +63,7 @@ p {
 }
 
 .blob-b {
-  background: #37c6ab;
+  background: var(--mint-soft);
   width: 300px;
   height: 300px;
   right: -60px;
@@ -70,7 +72,7 @@ p {
 }
 
 .blob-c {
-  background: #f26419;
+  background: var(--accent);
   width: 250px;
   height: 250px;
   bottom: -80px;
@@ -117,23 +119,23 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(120deg, var(--accent), #ff8245);
+  background: linear-gradient(120deg, var(--accent), var(--accent-soft));
   box-shadow: var(--shadow);
   color: #fff;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(120deg, var(--accent-deep), var(--accent));
+  background: linear-gradient(120deg, var(--ink), var(--accent));
 }
 
 .btn-outline {
   border-color: var(--ink);
-  background: #ffffff8f;
+  background: rgba(145, 224, 192, 0.24);
 }
 
 .btn-ghost {
   border-color: var(--stroke);
-  background: #ffffffa6;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .btn-lg {
@@ -155,7 +157,7 @@ p {
 .view-panel,
 .leaderboard-shell {
   backdrop-filter: blur(1px);
-  background: #fff9f3cc;
+  background: var(--panel);
   border: 1px solid var(--stroke);
   border-radius: 24px;
   box-shadow: var(--shadow);
@@ -169,7 +171,7 @@ p {
 }
 
 .eyebrow {
-  color: var(--accent-deep);
+  color: var(--accent);
   font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -225,14 +227,14 @@ p {
 }
 
 .mini-cell.done {
-  background: linear-gradient(120deg, #37c6ab 0%, #9ce8d8 100%);
+  background: linear-gradient(120deg, var(--mint) 0%, var(--mint-soft) 100%);
 }
 
 .app-topbar {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: #f6f2eadb;
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--stroke);
 }
@@ -321,7 +323,7 @@ p {
 }
 
 .menu-panel button:hover {
-  background: #f6f2ea;
+  background: rgba(145, 224, 192, 0.2);
 }
 
 .app-main {
@@ -383,14 +385,14 @@ p {
 }
 
 .progress-track {
-  background: #e8e2d6;
+  background: rgba(51, 78, 88, 0.14);
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
 }
 
 .progress-fill {
-  background: linear-gradient(120deg, var(--mint), #25a088);
+  background: linear-gradient(120deg, var(--mint), var(--mint-soft));
   height: 100%;
   transition: width 250ms ease;
 }
@@ -422,11 +424,11 @@ p {
 }
 
 .leaderboard-table tbody tr:nth-child(1) {
-  background: #fff8d2;
+  background: rgba(247, 162, 120, 0.35);
 }
 
 .leaderboard-table tbody tr.self {
-  background: #def7f1;
+  background: rgba(145, 224, 192, 0.42);
   font-weight: 700;
 }
 
