@@ -6,7 +6,6 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
-const supabase = require("./supabase");
 
 function loadEnvFile() {
   const envPath = path.join(__dirname, ".env");
@@ -63,6 +62,8 @@ function loadEnvFile() {
 
 loadEnvFile();
 
+const supabase = require("./supabase");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -78,6 +79,18 @@ if (!HAS_GOOGLE_OAUTH) {
     "Google OAuth env vars are missing. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI in Backend/.env"
   );
 }
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || "replace-me",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  },
+}));
 
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
