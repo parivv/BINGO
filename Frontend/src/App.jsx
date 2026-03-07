@@ -226,7 +226,6 @@ function AuthPage({ setUser }) {
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [isMenuOpen, setMenuOpen] = useState(false);
   const [boards, setBoards] = useState(() => readBoards());
 
   useEffect(() => {
@@ -318,58 +317,30 @@ function DashboardPage({ user, setUser }) {
             Dashboard
           </button>
           <button
+            className={`nav-link ${activeTab === "create" ? "is-active" : ""}`}
+            type="button"
+            onClick={() => setActiveTab("create")}
+          >
+            Create
+          </button>
+          <button
             className={`nav-link ${activeTab === "leaderboard" ? "is-active" : ""}`}
             type="button"
             onClick={() => setActiveTab("leaderboard")}
           >
             Leaderboard
           </button>
-        </nav>
-
-        <div className="menu-wrap">
           <button
-            className="menu-toggle"
-            aria-expanded={isMenuOpen ? "true" : "false"}
+            className={`nav-link ${activeTab === "profile" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setMenuOpen((current) => !current)}
+            onClick={() => setActiveTab("profile")}
           >
-            <span></span>
-            <span></span>
-            <span></span>
-            <span className="sr-only">Open account menu</span>
+            Profile
           </button>
-
-          {isMenuOpen && (
-            <div className="menu-panel" role="menu">
-              <button
-                role="menuitem"
-                type="button"
-                onClick={() => {
-                  createBoard();
-                  setMenuOpen(false);
-                }}
-              >
-                Create New BINGO Board
-              </button>
-              <button
-                role="menuitem"
-                type="button"
-                onClick={() => {
-                  const groupCode = window.prompt("Enter a group code to join:", "GOALS-2026");
-                  if (groupCode && groupCode.trim()) {
-                    window.alert(`Joined group ${groupCode.trim()} successfully.`);
-                  }
-                  setMenuOpen(false);
-                }}
-              >
-                Join a Group
-              </button>
-              <button role="menuitem" type="button" onClick={signOut}>
-                Sign Out
-              </button>
-            </div>
-          )}
-        </div>
+          <button className="nav-link nav-signout" type="button" onClick={signOut}>
+            Sign Out
+          </button>
+        </nav>
       </header>
 
       <main className="app-main">
@@ -415,6 +386,23 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
 
+        {activeTab === "create" && (
+          <section className="view-panel" aria-labelledby="createTitle">
+            <div className="panel-head">
+              <h1 id="createTitle">Create a New Card</h1>
+              <p>Build a fresh BINGO board and start tracking your goals today.</p>
+            </div>
+
+            <div className="empty-state">
+              <h2>Ready for a new challenge?</h2>
+              <p>Choose a board name and number of goals, then we will add it to your dashboard.</p>
+              <button className="btn btn-primary" type="button" onClick={createBoard}>
+                Create a Board
+              </button>
+            </div>
+          </section>
+        )}
+
         {activeTab === "leaderboard" && (
           <section className="view-panel" aria-labelledby="leaderboardTitle">
             <div className="panel-head">
@@ -441,6 +429,21 @@ function DashboardPage({ user, setUser }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "profile" && (
+          <section className="view-panel" aria-labelledby="profileTitle">
+            <div className="panel-head">
+              <h1 id="profileTitle">Profile</h1>
+              <p>Account and progress overview for {user.name}.</p>
+            </div>
+
+            <div className="empty-state">
+              <h2>{user.name}</h2>
+              <p>Total boards: {boards.length}</p>
+              <p>Average progress: {yourProgress}%</p>
             </div>
           </section>
         )}
