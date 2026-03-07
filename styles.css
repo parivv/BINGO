@@ -18,9 +18,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: "Manrope", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at 10% 10%, rgba(247, 162, 120, 0.45) 0%, rgba(145, 224, 192, 0.42) 45%, rgba(59, 164, 133, 0.5) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.95));
+  background: #f6fbf9;
   min-height: 100vh;
   position: relative;
 }
@@ -119,13 +117,13 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(120deg, var(--accent), var(--accent-soft));
+  background: var(--accent);
   box-shadow: var(--shadow);
   color: #fff;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(120deg, var(--ink), var(--accent));
+  background: var(--ink);
 }
 
 .btn-outline {
@@ -302,7 +300,7 @@ p {
 }
 
 .mini-cell.done {
-  background: linear-gradient(120deg, var(--mint) 0%, var(--mint-soft) 100%);
+  background: var(--mint-soft);
 }
 
 .app-topbar {
@@ -467,7 +465,7 @@ p {
 }
 
 .progress-fill {
-  background: linear-gradient(120deg, var(--mint), var(--mint-soft));
+  background: var(--mint);
   height: 100%;
   transition: width 250ms ease;
 }
