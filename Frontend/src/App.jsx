@@ -69,15 +69,15 @@ function LandingPage() {
 
       <main className="landing-main">
         <section className="hero" aria-labelledby="hero-title">
-          <p className="eyebrow">Build Momentum, Not Just Lists</p>
-          <h1 id="hero-title">Turn your goals into a BINGO challenge you actually finish.</h1>
+          <p className="eyebrow">Turn intent into action</p>
+          <h1 id="hero-title">Transform your goals into an explosive challenge</h1>
           <p className="hero-copy">
             Bingo Battles helps you map your personal goals onto a board, track real progress, and stay motivated with
             friendly competition. Complete squares, raise your percentage, and race your friends on the leaderboard.
           </p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/auth?mode=signup")}>
-              Start Your First Board
+              Create Your First Board
             </button>
             <button className="btn btn-ghost btn-lg" type="button" onClick={() => navigate("/auth?mode=login")}>
               I Already Have an Account
@@ -88,15 +88,15 @@ function LandingPage() {
         <section className="usage-panel" aria-labelledby="usage-title">
           <h2 id="usage-title">How It Works</h2>
           <ol>
-            <li>Create a board for your fitness, career, school, or life goals.</li>
-            <li>Mark completed goals and watch your completion percentage rise.</li>
+            <li>Create a custom Bingo board for your personal goals.</li>
+            <li>Track progress, mark completed goals, and watch your completion percentage rise.</li>
             <li>Join a group and compare progress on the leaderboard.</li>
           </ol>
           <div className="mini-preview" aria-hidden="true">
-            <div className="mini-cell done">Apply to job</div>
-            <div className="mini-cell">Read 4 books</div>
-            <div className="mini-cell done">Workout 20x</div>
-            <div className="mini-cell">Build portfolio</div>
+            <div className="mini-cell done">Learn 2 songs on the guitar</div>
+            <div className="mini-cell">Read 4 novels</div>
+            <div className="mini-cell done">20 consecutive pull-ups</div>
+            <div className="mini-cell">Visit a new state</div>
           </div>
         </section>
       </main>
@@ -148,7 +148,7 @@ function AuthPage({ setUser }) {
 
       <main className="auth-main">
         <section className="auth-card" aria-labelledby="authTitle">
-          <p className="eyebrow">{isSignup ? "Create Account" : "Welcome Back"}</p>
+          <p className="eyebrow">{isSignup ? "Create an Account" : "Welcome Back"}</p>
           <h1 id="authTitle">{isSignup ? "Sign Up" : "Log In"}</h1>
           <p className="auth-subtitle">
             {isSignup

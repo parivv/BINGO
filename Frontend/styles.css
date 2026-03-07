@@ -1,6 +1,9 @@
 @import url("https://fonts.cdnfonts.com/css/volcanic-dungeon");
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&display=swap");
 
 :root {
+  --font-body: "Baloo 2", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-display: "Luckiest Guy", "Bungee", Impact, sans-serif;
   --ink: #342020;
   --accent: #c10b3c;
   --accent-soft: #ee8207;
@@ -19,7 +22,9 @@
 body {
   margin: 0;
   color: var(--ink);
-  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.01em;
   background: var(--paper);
   min-height: 100vh;
   position: relative;
@@ -28,6 +33,8 @@ body {
 h1,
 h2,
 h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
   margin: 0;
   line-height: 1.1;
 }
@@ -108,7 +115,7 @@ p {
   border-radius: 999px;
   color: var(--ink);
   cursor: pointer;
-  font-family: "Manrope", sans-serif;
+  font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 700;
   padding: 0.58rem 1.15rem;
@@ -130,7 +137,7 @@ p {
 }
 
 .btn-outline {
-  border-color: var(--ink);
+  border-color: var(--stroke);
   background: rgba(238, 130, 7, 0.16);
 }
 
@@ -259,7 +266,7 @@ p {
 }
 
 .hero h1 {
-  font-size: clamp(1.9rem, 5vw, 3.1rem);
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
 }
 
 .hero-copy {
