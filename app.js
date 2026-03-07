@@ -1,6 +1,6 @@
 const STORAGE_KEYS = {
-  user: "goalgrid.user",
-  boards: "goalgrid.boards"
+  user: "bingo-battles.user",
+  boards: "bingo-battles.boards"
 };
 
 document.addEventListener("DOMContentLoaded", () => {
