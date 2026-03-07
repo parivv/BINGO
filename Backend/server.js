@@ -6,7 +6,6 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
-const supabase = require("./supabase");
 
 function loadEnvFile() {
   const envPath = path.join(__dirname, ".env");
@@ -62,6 +61,8 @@ function loadEnvFile() {
 }
 
 loadEnvFile();
+
+const supabase = require("./supabase");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
