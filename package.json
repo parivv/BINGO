@@ -1,0 +1,9 @@
+{
+  "name": "bingo-workspace",
+  "private": true,
+  "scripts": {
+    "backend": "npm --prefix Backend run start",
+    "start": "npm --prefix Frontend run dev",
+    "install:all": "npm --prefix Backend install && npm --prefix Frontend install"
+  }
+}
