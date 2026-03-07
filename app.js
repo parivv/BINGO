@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeLandingPage();
+  initializeAuthPage();
   initializeDashboardPage();
 });
 
@@ -18,13 +19,85 @@ function initializeLandingPage() {
     return;
   }
 
-  const login = () => authenticate("login");
-  const signup = () => authenticate("signup");
+  const login = () => {
+    window.location.href = "auth.html?mode=login";
+  };
+
+  const signup = () => {
+    window.location.href = "auth.html?mode=signup";
+  };
 
   loginBtn?.addEventListener("click", login);
   heroLoginBtn?.addEventListener("click", login);
   signupBtn?.addEventListener("click", signup);
   heroSignupBtn?.addEventListener("click", signup);
+}
+
+function initializeAuthPage() {
+  const authForm = document.getElementById("authForm");
+  if (!authForm) {
+    return;
+  }
+
+  const mode = new URLSearchParams(window.location.search).get("mode") === "signup"
+    ? "signup"
+    : "login";
+
+  const authTitle = document.getElementById("authTitle");
+  const authEyebrow = document.getElementById("authEyebrow");
+  const authSubtitle = document.getElementById("authSubtitle");
+  const authSubmit = document.getElementById("authSubmit");
+  const authSwitchText = document.getElementById("authSwitchText");
+  const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+  const usernameInput = document.getElementById("usernameInput");
+  const passwordInput = document.getElementById("passwordInput");
+  const authError = document.getElementById("authError");
+
+  if (mode === "signup") {
+    authEyebrow.textContent = "Create Account";
+    authTitle.textContent = "Sign Up";
+    authSubtitle.textContent = "Create an account to start your Bingo Battles board.";
+    authSubmit.textContent = "Create Account";
+    authSwitchText.innerHTML = "Already have an account? <a class=\"text-link\" href=\"auth.html?mode=login\">Log In</a>";
+  } else {
+    authEyebrow.textContent = "Welcome Back";
+    authTitle.textContent = "Log In";
+    authSubtitle.textContent = "Sign in to keep tracking your goals.";
+    authSubmit.textContent = "Log In";
+    authSwitchText.innerHTML = "Need an account? <a class=\"text-link\" href=\"auth.html?mode=signup\">Sign Up</a>";
+  }
+
+  forgotPasswordLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    window.alert("Password reset is coming soon.");
+  });
+
+  authForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    authError.hidden = true;
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) {
+      authError.textContent = "Username and password are required.";
+      authError.hidden = false;
+      return;
+    }
+
+    if (password.length < 6) {
+      authError.textContent = "Password must be at least 6 characters.";
+      authError.hidden = false;
+      return;
+    }
+
+    const user = {
+      name: username
+    };
+
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+    window.location.href = "dashboard.html";
+  });
 }
 
 function initializeDashboardPage() {
@@ -231,22 +304,6 @@ function initializeDashboardPage() {
     targetBoard.completed = Math.min(targetBoard.total, targetBoard.completed + 1);
     localStorage.setItem(STORAGE_KEYS.boards, JSON.stringify(boards));
   }
-}
-
-function authenticate(mode) {
-  const label = mode === "signup" ? "Create your account" : "Welcome back";
-  const name = window.prompt(`${label}\nEnter your display name:`, "Goal Chaser");
-
-  if (!name || !name.trim()) {
-    return;
-  }
-
-  const user = {
-    name: name.trim()
-  };
-
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
-  window.location.href = "dashboard.html";
 }
 
 function getUser() {
