@@ -67,7 +67,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const FRONTEND_REDIRECT =
-  process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/schedule.html`;
+  process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
 const HAS_GOOGLE_OAUTH =
   Boolean(process.env.GOOGLE_CLIENT_ID) &&
   Boolean(process.env.GOOGLE_CLIENT_SECRET) &&
