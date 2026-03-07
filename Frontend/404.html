@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Bingo Battles</title>
+    <script>
+      var path = window.location.pathname.replace('/BINGO', '');
+      sessionStorage.setItem('redirect', path);
+      window.location.replace('/BINGO');
+    </script>
+  </head>
+</html>

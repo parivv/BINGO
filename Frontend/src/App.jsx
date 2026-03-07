@@ -6,7 +6,7 @@ const STORAGE_KEYS = {
   boards: "bingo-battles.boards"
 };
 
-const BACKEND_ORIGIN = "http://localhost:5000";
+const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || "http://localhost:5000";
 
 function normalizeUser(rawUser) {
   if (!rawUser || typeof rawUser !== "object") {
