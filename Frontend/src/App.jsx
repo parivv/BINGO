@@ -8,6 +8,33 @@ const STORAGE_KEYS = {
 
 const BACKEND_ORIGIN = "http://localhost:5000";
 
+function normalizeUser(rawUser) {
+  if (!rawUser || typeof rawUser !== "object") {
+    return null;
+  }
+
+  const id = rawUser.id || rawUser.email || rawUser.name;
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    name: rawUser.name || rawUser.email || "Player",
+    email: rawUser.email || null,
+    provider: rawUser.provider || null
+  };
+}
+
+function getBoardsStorageKey(user) {
+  const normalized = normalizeUser(user);
+  if (!normalized) {
+    return null;
+  }
+
+  return `${STORAGE_KEYS.boards}:${normalized.id}`;
+}
+
 function readUser() {
   const raw = localStorage.getItem(STORAGE_KEYS.user);
   if (!raw) {
@@ -15,14 +42,19 @@ function readUser() {
   }
 
   try {
-    return JSON.parse(raw);
+    return normalizeUser(JSON.parse(raw));
   } catch (_error) {
     return null;
   }
 }
 
-function readBoards() {
-  const raw = localStorage.getItem(STORAGE_KEYS.boards);
+function readBoards(user) {
+  const key = getBoardsStorageKey(user);
+  if (!key) {
+    return [];
+  }
+
+  const raw = localStorage.getItem(key);
   if (!raw) {
     return [];
   }
@@ -35,8 +67,13 @@ function readBoards() {
   }
 }
 
-function writeBoards(boards) {
-  localStorage.setItem(STORAGE_KEYS.boards, JSON.stringify(boards));
+function writeBoards(user, boards) {
+  const key = getBoardsStorageKey(user);
+  if (!key) {
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(boards));
 }
 
 function AmbientBackground() {
@@ -58,10 +95,10 @@ function LandingPage() {
       <header className="topbar landing-topbar">
         <Link className="brand" to="/">Bingo Battles</Link>
         <nav className="auth-links" aria-label="Authentication links">
-          <button className="btn btn-outline" type="button" onClick={() => navigate("/auth?mode=login")}>
+          <button className="btn btn-outline" type="button" onClick={() => navigate("/login")}>
             Log In
           </button>
-          <button className="btn btn-primary" type="button" onClick={() => navigate("/auth?mode=signup")}>
+          <button className="btn btn-primary" type="button" onClick={() => navigate("/signup")}>
             Sign Up
           </button>
         </nav>
@@ -76,10 +113,10 @@ function LandingPage() {
             friendly competition. Complete squares, raise your percentage, and race your friends on the leaderboard.
           </p>
           <div className="hero-actions">
-            <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/auth?mode=signup")}>
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
               Create Your First Board
             </button>
-            <button className="btn btn-ghost btn-lg" type="button" onClick={() => navigate("/auth?mode=login")}>
+            <button className="btn btn-ghost btn-lg" type="button" onClick={() => navigate("/login")}>
               I Already Have an Account
             </button>
           </div>
@@ -104,21 +141,15 @@ function LandingPage() {
   );
 }
 
-function AuthPage({ setUser }) {
+function AuthPage({ setUser, mode }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const mode = useMemo(() => {
-    const query = new URLSearchParams(location.search);
-    return query.get("mode") === "signup" ? "signup" : "login";
-  }, [location.search]);
-
   const isSignup = mode === "signup";
 
-  function submitAuth(event) {
+  async function submitAuth(event) {
     event.preventDefault();
     setError("");
 
@@ -133,10 +164,34 @@ function AuthPage({ setUser }) {
       return;
     }
 
-    const nextUser = { name: trimmed };
-    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(nextUser));
-    setUser(nextUser);
-    navigate("/dashboard");
+    try {
+      const endpoint = isSignup ? '/auth/signup' : '/auth/login';
+      const response = await fetch(`${BACKEND_ORIGIN}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: trimmed, name: trimmed, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Authentication failed');
+        return;
+      }
+
+      const nextUser = normalizeUser(data.user);
+      if (!nextUser) {
+        setError("Invalid user response from server.");
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(nextUser));
+      setUser(nextUser);
+      navigate("/dashboard");
+    } catch (error) {
+      setError("Network error. Please try again.");
+    }
   }
 
   return (
@@ -157,7 +212,7 @@ function AuthPage({ setUser }) {
           </p>
 
           <form className="auth-form" noValidate onSubmit={submitAuth}>
-            <label className="field-label" htmlFor="usernameInput">Username</label>
+            <label className="field-label" htmlFor="usernameInput">Email</label>
             <input
               id="usernameInput"
               name="username"
@@ -209,7 +264,7 @@ function AuthPage({ setUser }) {
 
           <p className="auth-switch">
             {isSignup ? "Already have an account? " : "Need an account? "}
-            <Link className="text-link" to={isSignup ? "/auth?mode=login" : "/auth?mode=signup"}>
+            <Link className="text-link" to={isSignup ? "/login" : "/signup"}>
               {isSignup ? "Log In" : "Sign Up"}
             </Link>
           </p>
@@ -226,11 +281,15 @@ function AuthPage({ setUser }) {
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [boards, setBoards] = useState(() => readBoards());
+  const [boards, setBoards] = useState(() => readBoards(user));
 
   useEffect(() => {
-    writeBoards(boards);
-  }, [boards]);
+    setBoards(readBoards(user));
+  }, [user]);
+
+  useEffect(() => {
+    writeBoards(user, boards);
+  }, [boards, user]);
 
   const yourProgress = boards.length
     ? Math.round(
@@ -469,6 +528,8 @@ function DashboardGate({ user, setUser }) {
           credentials: "include"
         });
 
+        console.log('auth/me status:', response.status);
+
         if (!response.ok) {
           if (isMounted) {
             setLoading(false);
@@ -477,6 +538,7 @@ function DashboardGate({ user, setUser }) {
         }
 
         const payload = await response.json();
+        console.log('auth/me payload:', payload);
         if (!payload?.authenticated || !payload?.user) {
           if (isMounted) {
             setLoading(false);
@@ -485,7 +547,10 @@ function DashboardGate({ user, setUser }) {
         }
 
         const sessionUser = {
-          name: payload.user.name || payload.user.email || "Player"
+          id: payload.user.id || payload.user.email || payload.user.name,
+          name: payload.user.name || payload.user.email || "Player",
+          email: payload.user.email || null,
+          provider: payload.user.provider || null
         };
 
         localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(sessionUser));
@@ -494,6 +559,7 @@ function DashboardGate({ user, setUser }) {
           setLoading(false);
         }
       } catch (_error) {
+        console.log('syncUserFromSession error:', _error);
         if (isMounted) {
           setLoading(false);
         }
@@ -527,13 +593,23 @@ function DashboardGate({ user, setUser }) {
   return <DashboardPage user={user} setUser={setUser} />;
 }
 
+function AuthLegacyRedirect() {
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const mode = query.get("mode") === "signup" ? "signup" : "login";
+
+  return <Navigate to={mode === "signup" ? "/signup" : "/login"} replace />;
+}
+
 export default function App() {
   const [user, setUser] = useState(() => readUser());
 
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth" element={<AuthPage setUser={setUser} />} />
+      <Route path="/auth" element={<AuthLegacyRedirect />} />
+      <Route path="/login" element={<AuthPage setUser={setUser} mode="login" />} />
+      <Route path="/signup" element={<AuthPage setUser={setUser} mode="signup" />} />
       <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
