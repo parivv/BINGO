@@ -31,7 +31,7 @@ body {
   font-family: var(--font-body);
   font-weight: 600;
   letter-spacing: 0.01em;
-  background: var(--paper);
+  background: #D9B4A7;
   min-height: 100vh;
   position: relative;
 }
@@ -68,8 +68,8 @@ p {
 }
 
 .blob {
+  display: none;
   border-radius: 999px;
-  display: block;
   filter: blur(2px);
   opacity: 0.3;
   position: absolute;
