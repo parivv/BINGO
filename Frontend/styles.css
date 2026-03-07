@@ -1,13 +1,15 @@
+@import url("https://fonts.cdnfonts.com/css/volcanic-dungeon");
+
 :root {
-  --ink: #334e58;
-  --accent: #ce3760;
-  --accent-soft: #f7a278;
-  --mint: #3ba485;
-  --mint-soft: #91e0c0;
-  --paper: #f7a278;
-  --panel: rgba(255, 255, 255, 0.88);
-  --stroke: rgba(51, 78, 88, 0.2);
-  --shadow: 0 12px 30px rgba(51, 78, 88, 0.18);
+  --ink: #342020;
+  --accent: #c10b3c;
+  --accent-soft: #ee8207;
+  --mint: #87082a;
+  --mint-soft: rgba(238, 130, 7, 0.2);
+  --paper: #f4f9e9;
+  --panel: rgba(244, 249, 233, 0.9);
+  --stroke: rgba(52, 32, 32, 0.22);
+  --shadow: 0 12px 30px rgba(52, 32, 32, 0.22);
 }
 
 * {
@@ -18,7 +20,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: "Manrope", "Segoe UI", sans-serif;
-  background: #f6fbf9;
+  background: var(--paper);
   min-height: 100vh;
   position: relative;
 }
@@ -87,9 +89,10 @@ p {
 
 .brand {
   color: var(--ink);
-  font-family: "Bungee", Impact, sans-serif;
-  font-size: clamp(1.15rem, 2.3vw, 1.65rem);
+  font-family: "Volcanic Dungeon", "Bungee", Impact, sans-serif;
+  font-size: clamp(0.95rem, 1.85vw, 1.32rem);
   letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 rgba(193, 11, 60, 0.28);
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -128,12 +131,12 @@ p {
 
 .btn-outline {
   border-color: var(--ink);
-  background: rgba(145, 224, 192, 0.24);
+  background: rgba(238, 130, 7, 0.16);
 }
 
 .btn-ghost {
   border-color: var(--stroke);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(244, 249, 233, 0.76);
 }
 
 .btn-lg {
@@ -178,7 +181,7 @@ p {
 
 .field-input {
   appearance: none;
-  background: #fff;
+  background: var(--paper);
   border: 1px solid var(--stroke);
   border-radius: 12px;
   color: var(--ink);
@@ -187,8 +190,8 @@ p {
 }
 
 .field-input:focus {
-  border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(145, 224, 192, 0.38);
+  border-color: var(--accent-soft);
+  box-shadow: 0 0 0 3px rgba(238, 130, 7, 0.28);
   outline: none;
 }
 
@@ -295,7 +298,7 @@ p {
 }
 
 .mini-cell {
-  background: #fff;
+  background: var(--paper);
   border-radius: 14px;
   border: 1px solid var(--stroke);
   font-size: 0.84rem;
@@ -311,7 +314,7 @@ p {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(244, 249, 233, 0.82);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--stroke);
 }
@@ -333,7 +336,7 @@ p {
 }
 
 .nav-link.is-active {
-  background: #fff;
+  background: var(--paper);
   box-shadow: inset 0 0 0 1px var(--stroke);
 }
 
@@ -343,7 +346,7 @@ p {
 
 .menu-toggle {
   align-items: center;
-  background: #fff;
+  background: var(--paper);
   border: 1px solid var(--stroke);
   border-radius: 14px;
   cursor: pointer;
@@ -375,7 +378,7 @@ p {
 }
 
 .menu-panel {
-  background: #fff;
+  background: var(--paper);
   border: 1px solid var(--stroke);
   border-radius: 14px;
   box-shadow: var(--shadow);
@@ -400,7 +403,7 @@ p {
 }
 
 .menu-panel button:hover {
-  background: rgba(145, 224, 192, 0.2);
+  background: rgba(238, 130, 7, 0.16);
 }
 
 .app-main {
@@ -425,7 +428,7 @@ p {
 }
 
 .empty-state {
-  background: #fff;
+  background: var(--paper);
   border: 1px dashed var(--stroke);
   border-radius: 18px;
   display: grid;
@@ -442,7 +445,7 @@ p {
 }
 
 .board-card {
-  background: #fff;
+  background: var(--paper);
   border: 1px solid var(--stroke);
   border-radius: 16px;
   display: grid;
@@ -462,7 +465,7 @@ p {
 }
 
 .progress-track {
-  background: rgba(51, 78, 88, 0.14);
+  background: rgba(52, 32, 32, 0.16);
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
@@ -480,7 +483,7 @@ p {
   border-radius: 10px;
   border: 1px solid var(--stroke);
   padding: 0.45rem 0.65rem;
-  background: #fff;
+  background: var(--paper);
 }
 
 .leaderboard-shell {
@@ -501,11 +504,11 @@ p {
 }
 
 .leaderboard-table tbody tr:nth-child(1) {
-  background: rgba(247, 162, 120, 0.35);
+  background: rgba(238, 130, 7, 0.24);
 }
 
 .leaderboard-table tbody tr.self {
-  background: rgba(145, 224, 192, 0.42);
+  background: rgba(135, 8, 42, 0.16);
   font-weight: 700;
 }
 
