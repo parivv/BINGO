@@ -5,5 +5,9 @@
     "backend": "npm --prefix Backend run start",
     "start": "npm --prefix Frontend run dev",
     "install:all": "npm --prefix Backend install && npm --prefix Frontend install"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "bcrypt": "^6.0.0"
   }
 }

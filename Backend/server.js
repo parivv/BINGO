@@ -5,6 +5,8 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcrypt");
+const supabase = require("./supabase");
 
 function loadEnvFile() {
   const envPath = path.join(__dirname, ".env");
@@ -111,15 +113,21 @@ if (HAS_GOOGLE_OAUTH) {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: process.env.GOOGLE_REDIRECT_URI,
       },
-      (_accessToken, _refreshToken, profile, done) => {
-        const user = {
-          id: profile.id,
-          name: profile.displayName,
-          email: profile.emails?.[0]?.value || null,
-          photo: profile.photos?.[0]?.value || null,
-        };
-        done(null, user);
-      }
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+            const email = profile.emails?.[0]?.value || null;
+            const { data: existingUser } = await supabase
+                .from('users').select('*').eq('email', email).single();
+            if (!existingUser) {
+                const { data: newUser } = await supabase
+                    .from('users').insert({ email, name : profile.displayName, avatar_url: profile.photos?.[0]?.value || null, provider: 'google' }).select().single();
+                return done(null, newUser);
+            }
+            return done(null, existingUser)
+        }catch (err) {
+            return done(err, null);
+        }
+    }
     )
   );
 }
@@ -189,6 +197,57 @@ app.post("/api/contact", (req, res) => {
   // TODO: save to DB or send email
   res.json({ success: true });
 });
+
+// ─── Email Sign Up ────────────────────────────────────────────
+app.post('/auth/signup', async (req, res) => {
+  const { email, name, password } = req.body;
+  if (!email || !name || !password)
+    return res.status(400).json({ error: 'All fields required' });
+
+  const { data: existingUser } = await supabase
+    .from('users').select('*').eq('email', email).single();
+
+  if (existingUser)
+    return res.status(400).json({ error: 'Email already in use' });
+
+  const password_hash = await bcrypt.hash(password, 10);
+
+  const { data: newUser, error } = await supabase
+    .from('users')
+    .insert({ email, name, password_hash, provider: 'email' })
+    .select().single();
+
+  if (error) return res.status(500).json({ error: 'Signup failed' });
+
+  req.login(newUser, (err) => {
+    if (err) return res.status(500).json({ error: 'Login after signup failed' });
+    res.json({ success: true, user: newUser });
+  });
+});
+
+// ─── Email Sign In ────────────────────────────────────────────
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  const { data: user } = await supabase
+    .from('users').select('*').eq('email', email).single();
+
+  if (!user)
+    return res.status(400).json({ error: 'User not found' });
+
+  if (user.provider === 'google')
+    return res.status(400).json({ error: 'Please sign in with Google' });
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid)
+    return res.status(400).json({ error: 'Wrong password' });
+
+  req.login(user, (err) => {
+    if (err) return res.status(500).json({ error: 'Login failed' });
+    res.json({ success: true, user });
+  });
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
