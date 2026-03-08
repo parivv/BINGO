@@ -328,7 +328,7 @@ app.get("/api/groups", requireAuth, async (req, res) => {
 
   const { data: members, error: membersErr } = await supabase
     .from("group_members")
-    .select("group_id, user_id, user_name")
+    .select("group_id, user_id, user_name, assigned_board_id")
     .in("group_id", groupIds);
 
   if (membersErr) return res.status(500).json({ error: membersErr.message });
@@ -337,7 +337,11 @@ app.get("/api/groups", requireAuth, async (req, res) => {
     ...group,
     members: (members || [])
       .filter((member) => member.group_id === group.id)
-      .map((member) => ({ id: member.user_id, name: member.user_name }))
+      .map((member) => ({
+        id: member.user_id,
+        name: member.user_name,
+        assignedBoardId: member.assigned_board_id || null
+      }))
   }));
 
   return res.json({ groups: withMembers });
@@ -372,7 +376,8 @@ app.post("/api/groups", requireAuth, async (req, res) => {
       .insert({
         group_id: createdGroup.id,
         user_id: userId,
-        user_name: userName
+        user_name: userName,
+        assigned_board_id: null
       });
 
     if (memberErr) return res.status(500).json({ error: memberErr.message });
@@ -380,7 +385,7 @@ app.post("/api/groups", requireAuth, async (req, res) => {
     return res.status(201).json({
       group: {
         ...createdGroup,
-        members: [{ id: userId, name: userName }]
+        members: [{ id: userId, name: userName, assignedBoardId: null }]
       }
     });
   } catch (error) {
@@ -421,12 +426,67 @@ app.post("/api/groups/join", requireAuth, async (req, res) => {
     .insert({
       group_id: group.id,
       user_id: userId,
-      user_name: userName
+      user_name: userName,
+      assigned_board_id: null
     });
 
   if (joinErr) return res.status(500).json({ error: joinErr.message });
 
   return res.json({ group, joined: true });
+});
+
+app.put("/api/groups/:groupId/assignment", requireAuth, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user?.id;
+  const boardId = req.body?.boardId || null;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipError) {
+    return res.status(500).json({ error: membershipError.message });
+  }
+
+  if (!membership) {
+    return res.status(403).json({ error: "Not a member of this group." });
+  }
+
+  if (boardId) {
+    const { data: board, error: boardError } = await supabase
+      .from("boards")
+      .select("id")
+      .eq("id", boardId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (boardError) {
+      return res.status(500).json({ error: boardError.message });
+    }
+
+    if (!board) {
+      return res.status(400).json({ error: "Selected board does not belong to your account." });
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("group_members")
+    .update({ assigned_board_id: boardId })
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+
+  if (updateError) {
+    return res.status(500).json({ error: updateError.message });
+  }
+
+  return res.json({ success: true, assignedBoardId: boardId });
 });
 
 // Group leaderboard
@@ -447,31 +507,32 @@ app.get("/api/groups/:groupId/leaderboard", requireAuth, async (req, res) => {
 
   const { data: members, error: membersErr } = await supabase
     .from("group_members")
-    .select("user_id, user_name")
+    .select("user_id, user_name, assigned_board_id")
     .eq("group_id", groupId);
 
   if (membersErr) return res.status(500).json({ error: membersErr.message });
 
-  const memberIds = (members || []).map((m) => m.user_id);
+  const assignedBoardIds = (members || [])
+    .map((member) => member.assigned_board_id)
+    .filter(Boolean);
 
   const { data: boards, error: boardsErr } = await supabase
     .from("boards")
-    .select("user_id, total, completed")
-    .in("user_id", memberIds);
+    .select("id, title, user_id, total, completed")
+    .in("id", assignedBoardIds.length > 0 ? assignedBoardIds : ["00000000-0000-0000-0000-000000000000"]);
 
   if (boardsErr) return res.status(500).json({ error: boardsErr.message });
 
   const entries = (members || []).map((member) => {
-    const ownBoards = (boards || []).filter((b) => b.user_id === member.user_id);
-    const progress = ownBoards.length
-      ? Math.round(ownBoards.reduce((sum, b) => sum + Math.round((b.completed / b.total) * 100), 0) / ownBoards.length)
-      : 0;
+    const assignedBoard = (boards || []).find((board) => board.id === member.assigned_board_id);
+    const progress = assignedBoard ? Math.round((assignedBoard.completed / assignedBoard.total) * 100) : 0;
 
     return {
       id: member.user_id,
       name: member.user_name,
       progress,
-      boardCount: ownBoards.length,
+      boardCount: assignedBoard ? 1 : 0,
+      assignedBoardTitle: assignedBoard ? assignedBoard.title : null,
       isSelf: member.user_id === userId
     };
   }).sort((a, b) => b.progress - a.progress);
