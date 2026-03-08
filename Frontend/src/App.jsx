@@ -945,6 +945,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState(null);
+  const [hasLoadedBoards, setHasLoadedBoards] = useState(false);
   const [editingBoard, setEditingBoard] = useState(null);
   const [editingGoals, setEditingGoals] = useState([]);
   const [editingTitle, setEditingTitle] = useState("");
@@ -957,6 +958,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   }
 
   useEffect(() => {
+    setHasLoadedBoards(false);
     let isMounted = true;
 
     async function loadBoards() {
@@ -970,6 +972,10 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
         if (isMounted) {
           setGroupNotice(error.message || "Could not load boards.");
         }
+      } finally {
+        if (isMounted) {
+          setHasLoadedBoards(true);
+        }
       }
     }
 
@@ -981,9 +987,13 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   }, [user.id]);
 
   useEffect(() => {
+    if (!hasLoadedBoards) {
+      return;
+    }
+
     const orderedIds = boards.map((board) => board.id);
     localStorage.setItem(getBoardOrderStorageKey(user.id), JSON.stringify(orderedIds));
-  }, [boards, user.id]);
+  }, [boards, hasLoadedBoards, user.id]);
 
   useEffect(() => {
     let isMounted = true;
