@@ -1692,7 +1692,7 @@ function DashboardPage({ user, setUser }) {
                     </div>
                   </div>
 
-                  <div className="preview-strip" aria-hidden="true" style={{ borderColor: draftBoardColor }}>
+                  <div className="preview-strip" aria-hidden="true" style={{ borderColor: draftBoardColor, backgroundColor: draftBoardColor }}>
                     {Array.from({ length: 5 }).map((_, index) => (
                       <span key={`preview-${index}`} className={`preview-tile shape-${draftTileShape}`}></span>
                     ))}

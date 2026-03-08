@@ -729,7 +729,7 @@ p {
 }
 
 .color-option {
-  border: 2px solid transparent;
+  border: 4px solid transparent;
   border-radius: 12px;
   cursor: pointer;
   height: 44px;
@@ -787,7 +787,6 @@ p {
 }
 
 .preview-strip {
-  background: rgba(193, 11, 60, 0.08);
   border: 4px solid var(--accent);
   border-radius: 12px;
   display: grid;
