@@ -8,6 +8,27 @@ const STORAGE_KEYS = {
 
 const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || "http://localhost:5000";
 
+function toUsername(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const separatorIndex = trimmed.indexOf("@");
+  return separatorIndex > 0 ? trimmed.slice(0, separatorIndex) : trimmed;
+}
+
+function resolveDisplayName(name, email) {
+  const preferredName = typeof name === "string" ? name.trim() : "";
+  const candidate = preferredName || email;
+  const username = toUsername(candidate);
+  return username || "Player";
+}
+
 function normalizeUser(rawUser) {
   if (!rawUser || typeof rawUser !== "object") {
     return null;
@@ -20,7 +41,7 @@ function normalizeUser(rawUser) {
 
   return {
     id,
-    name: rawUser.name || rawUser.email || "Player",
+    name: resolveDisplayName(rawUser.name, rawUser.email),
     email: rawUser.email || null,
     provider: rawUser.provider || null
   };
@@ -97,14 +118,15 @@ function AppFooter() {
   );
 }
 
-function LandingPage() {
+function LandingPage({ user }) {
   const navigate = useNavigate();
+  const brandTarget = user ? "/dashboard" : "/";
 
   return (
     <>
       <AmbientBackground />
       <header className="topbar app-topbar">
-        <Link className="brand" to="/">Bingo Battles</Link>
+        <Link className="brand" to={brandTarget}>Bingo Battles</Link>
         <nav className="primary-nav auth-links" aria-label="Authentication links">
           <button className="btn btn-outline" type="button" onClick={() => navigate("/login")}>
             Log In
@@ -154,8 +176,9 @@ function LandingPage() {
   );
 }
 
-function AuthPage({ setUser, mode }) {
+function AuthPage({ setUser, mode, user }) {
   const navigate = useNavigate();
+  const brandTarget = user ? "/dashboard" : "/";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -211,7 +234,7 @@ function AuthPage({ setUser, mode }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar">
-        <Link className="brand" to="/">Bingo Battles</Link>
+        <Link className="brand" to={brandTarget}>Bingo Battles</Link>
         <nav className="primary-nav auth-links" aria-label="Authentication navigation">
           <button className="btn btn-outline" type="button" onClick={() => navigate("/")}>
             About
@@ -392,7 +415,9 @@ function DashboardPage({ user, setUser }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar">
-        <Link className="brand" to="/dashboard">Bingo Battles</Link>
+        <Link className="brand" to="/dashboard" onClick={() => setActiveTab("dashboard")}>
+          Bingo Battles
+        </Link>
 
         <nav className="primary-nav" aria-label="Primary navigation">
           <button
@@ -440,7 +465,7 @@ function DashboardPage({ user, setUser }) {
             {boards.length === 0 && (
               <div className="empty-state">
                 <h2>No boards yet</h2>
-                <p>Create your first BINGO board to start tracking progress.</p>
+                <p>Create your first Bingo board to start tracking progress.</p>
                 <button className="btn btn-primary" type="button" onClick={createBoard}>
                   Create a Board
                 </button>
@@ -575,12 +600,13 @@ function DashboardGate({ user, setUser }) {
           return;
         }
 
-        const sessionUser = {
-          id: payload.user.id || payload.user.email || payload.user.name,
-          name: payload.user.name || payload.user.email || "Player",
-          email: payload.user.email || null,
-          provider: payload.user.provider || null
-        };
+        const sessionUser = normalizeUser(payload.user);
+        if (!sessionUser) {
+          if (isMounted) {
+            setLoading(false);
+          }
+          return;
+        }
 
         localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(sessionUser));
         if (isMounted) {
@@ -636,10 +662,10 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<LandingPage user={user} />} />
       <Route path="/auth" element={<AuthLegacyRedirect />} />
-      <Route path="/login" element={<AuthPage setUser={setUser} mode="login" />} />
-      <Route path="/signup" element={<AuthPage setUser={setUser} mode="signup" />} />
+      <Route path="/login" element={<AuthPage setUser={setUser} mode="login" user={user} />} />
+      <Route path="/signup" element={<AuthPage setUser={setUser} mode="signup" user={user} />} />
       <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
