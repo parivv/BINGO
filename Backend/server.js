@@ -78,6 +78,7 @@ const geminiClient = process.env.GEMINI_API_KEY
   : null;
 const ALLOWED_GAME_TYPES = new Set(["five-in-a-row", "blackout"]);
 const ALLOWED_TILE_SHAPES = new Set(["rounded", "square", "circle"]);
+const DEFAULT_DEPLOYED_ORIGIN = "https://parivv.github.io";
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -91,6 +92,23 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 const FRONTEND_REDIRECT =
   process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
+function parseBoolean(value, fallback = false) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
 
 function toOrigin(value) {
   if (!value) {
@@ -115,6 +133,25 @@ function getRequestOrigin(req) {
 }
 
 const FRONTEND_ORIGIN_BASE = toOrigin(FRONTEND_ORIGIN) || FRONTEND_ORIGIN;
+const FRONTEND_ORIGINS = [
+  FRONTEND_ORIGIN_BASE,
+  DEFAULT_DEPLOYED_ORIGIN,
+  ...String(process.env.FRONTEND_ORIGINS || "")
+    .split(",")
+    .map((origin) => toOrigin(origin.trim()) || origin.trim())
+    .filter(Boolean)
+];
+const ALLOWED_FRONTEND_ORIGINS = new Set(FRONTEND_ORIGINS);
+
+const SESSION_COOKIE_SECURE = parseBoolean(process.env.SESSION_COOKIE_SECURE, process.env.NODE_ENV === "production");
+const SESSION_COOKIE_SAME_SITE = process.env.SESSION_COOKIE_SAMESITE
+  ? process.env.SESSION_COOKIE_SAMESITE.trim().toLowerCase()
+  : (SESSION_COOKIE_SECURE ? "none" : "lax");
+
+if (SESSION_COOKIE_SECURE) {
+  // Required for secure cookies behind proxies like Render/Heroku.
+  app.set("trust proxy", 1);
+}
 
 function isAllowedFrontendRedirect(redirectUrl) {
   if (!redirectUrl) {
@@ -124,7 +161,7 @@ function isAllowedFrontendRedirect(redirectUrl) {
   try {
     const parsed = new URL(redirectUrl);
     const origin = parsed.origin;
-    return origin === FRONTEND_ORIGIN_BASE || LOCAL_ORIGIN_PATTERN.test(origin);
+    return ALLOWED_FRONTEND_ORIGINS.has(origin) || LOCAL_ORIGIN_PATTERN.test(origin);
   } catch (_error) {
     return false;
   }
@@ -158,7 +195,7 @@ app.use(
   cors({
     origin(origin, callback) {
       // Allow non-browser requests and local dev ports by default.
-      if (!origin || origin === FRONTEND_ORIGIN_BASE || LOCAL_ORIGIN_PATTERN.test(origin)) {
+      if (!origin || ALLOWED_FRONTEND_ORIGINS.has(origin) || LOCAL_ORIGIN_PATTERN.test(origin)) {
         return callback(null, true);
       }
 
@@ -175,8 +212,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      secure: SESSION_COOKIE_SECURE,
+      sameSite: SESSION_COOKIE_SAME_SITE,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
