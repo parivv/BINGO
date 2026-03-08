@@ -359,9 +359,9 @@ p {
   border-radius: 18px;
   box-shadow: 0 12px 32px rgba(52, 32, 32, 0.25);
   display: grid;
-  gap: 0.52rem;
-  padding: 1.8rem 1.8rem 1.2rem;
-  min-height: 360px;
+  gap: 0.34rem;
+  padding: 1.35rem 1.35rem 0.95rem;
+  min-height: 310px;
   justify-content: flex-start;
 }
 
@@ -377,6 +377,7 @@ p {
 }
 
 .feature-card h3 {
+  font-family: "CF Band of Brothers", "Volcanic Dungeon", Impact, sans-serif;
   font-size: 1.22rem;
   max-width: 14ch;
   line-height: 1.2;
