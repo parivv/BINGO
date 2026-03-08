@@ -2138,7 +2138,7 @@ function DashboardPage({ user, setUser }) {
           >
             <h2 id="deletePopupTitle">Delete Board?</h2>
             <p className="win-popup-board">{deletePopupBoard.title}</p>
-            <p>This action permanently deletes the board from your dashboard and Supabase.</p>
+            <p>This action permanently deletes this board from your dashboard. Are you sure?</p>
             <div className="confirm-popup-actions">
               <button className="btn btn-ghost" type="button" onClick={closeDeletePopup} disabled={Boolean(deletingBoardId)}>
                 Cancel
