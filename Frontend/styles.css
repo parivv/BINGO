@@ -533,10 +533,25 @@ p {
     flex-wrap: wrap;
     gap: 0.65rem;
   }
+
+  .dashboard-topbar .brand {
+    display: block;
+    flex: 1 0 100%;
+    text-align: center;
+  }
+
+  .dashboard-topbar .primary-nav {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .topbar .auth-links {
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 640px) {
-  .primary-nav {
+  .dashboard-topbar .primary-nav {
     order: 3;
     width: 100%;
     justify-content: center;

@@ -458,7 +458,7 @@ function DashboardPage({ user, setUser }) {
   return (
     <>
       <AmbientBackground />
-      <header className="topbar app-topbar">
+      <header className="topbar app-topbar dashboard-topbar">
         <Link className="brand" to="/dashboard" onClick={() => setActiveTab("dashboard")}>
           Bingo Battles
         </Link>
