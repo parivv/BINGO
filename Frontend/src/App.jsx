@@ -54,6 +54,22 @@ const DASHBOARD_TAB_ROUTES = {
   profile: "/dashboard/profile"
 };
 
+function getDashboardTabFromPath(pathname) {
+  if (pathname === DASHBOARD_TAB_ROUTES.create) {
+    return "create";
+  }
+
+  if (pathname === DASHBOARD_TAB_ROUTES.leaderboard) {
+    return "leaderboard";
+  }
+
+  if (pathname === DASHBOARD_TAB_ROUTES.profile) {
+    return "profile";
+  }
+
+  return "dashboard";
+}
+
 function hexToRgb(hexColor) {
   if (typeof hexColor !== "string") {
     return null;
@@ -901,7 +917,8 @@ function AuthPage({ setUser, mode, user }) {
 
 function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const location = useLocation();
+  const activeTab = getDashboardTabFromPath(location.pathname) || initialTab;
   const [boards, setBoards] = useState([]);
   const [createStep, setCreateStep] = useState(1);
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
@@ -935,12 +952,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const [editingTileShape, setEditingTileShape] = useState("rounded");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
   function goToTab(tabName) {
-    setActiveTab(tabName);
     navigate(DASHBOARD_TAB_ROUTES[tabName] || DASHBOARD_TAB_ROUTES.dashboard);
   }
 
@@ -1784,42 +1796,22 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
                         </button>
                       ))}
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+                    <div className="board-actions">
                       <button
                         className="btn btn-outline board-delete-btn"
                         type="button"
                         onClick={() => requestDeleteBoard(board)}
                         disabled={deletingBoardId === board.id}
-                        style={{ flex: 0.7 }}
                       >
                         {deletingBoardId === board.id ? "Deleting..." : "Delete"}
                       </button>
                       <button
-                        className="btn btn-outline"
+                        className="btn btn-outline board-edit-btn"
                         type="button"
                         onClick={() => openEditBoard(board)}
                         disabled={isSavingEdit}
-                        style={{ 
-                          flex: 1.3,
-                          background: "#ffffff",
-                          border: "2px solid #ffffff",
-                          color: "#ee8207",
-                          fontSize: "0.85rem",
-                          fontWeight: "600",
-                          padding: "0.5rem 0.75rem",
-                          cursor: "pointer",
-                          transition: "all 150ms ease"
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = "#f0f0f0";
-                          e.target.style.borderColor = "#ee8207";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = "#ffffff";
-                          e.target.style.borderColor = "#ffffff";
-                        }}
                       >
-                        {isSavingEdit ? "Saving..." : "Edit"}
+                        {isSavingEdit ? "Saving..." : "Edit Design"}
                       </button>
                     </div>
                   </article>
@@ -2275,8 +2267,10 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
               }}
               style={{ display: "grid", gap: "1rem" }}
             >
-              <div>
-                <label className="field-label" htmlFor="editBoardNameInput">Board Name</label>
+              <div style={{ display: "grid", gap: "0.6rem", gridTemplateColumns: "auto 1fr", alignItems: "center" }}>
+                <label className="field-label" htmlFor="editBoardNameInput" style={{ margin: 0, textAlign: "left" }}>
+                  Board Name
+                </label>
                 <input
                   id="editBoardNameInput"
                   className="field-input"
@@ -2333,12 +2327,13 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
+              <div style={{ display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(3, 1fr)", marginTop: "1rem" }}>
                 <button
                   type="button"
                   className="btn btn-ghost"
                   onClick={closeEditBoard}
                   disabled={isSavingEdit}
+                  style={{ gridColumn: 1 }}
                 >
                   Cancel
                 </button>
@@ -2346,6 +2341,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
                   type="submit"
                   className="btn btn-primary"
                   disabled={isSavingEdit}
+                  style={{ gridColumn: 3 }}
                 >
                   {isSavingEdit ? "Saving..." : "Save Changes"}
                 </button>
@@ -2364,8 +2360,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
             aria-labelledby="deletePopupTitle"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="deletePopupTitle">Delete Board?</h2>
-            <p className="win-popup-board">{deletePopupBoard.title}</p>
+            <h2 id="deletePopupTitle">Delete {deletePopupBoard.title}?</h2>
             <p>This action permanently deletes this board from your dashboard. Are you sure?</p>
             <div className="confirm-popup-actions">
               <button className="btn btn-ghost" type="button" onClick={closeDeletePopup} disabled={Boolean(deletingBoardId)}>

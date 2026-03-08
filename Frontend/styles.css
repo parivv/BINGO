@@ -1017,6 +1017,7 @@ p {
   color: #c10b3c;
   font-size: 0.85rem;
   font-weight: 600;
+  min-width: 120px;
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   transition: all 150ms ease;
@@ -1028,6 +1029,33 @@ p {
 }
 
 .board-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.board-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.board-edit-btn {
+  background: #ffffff;
+  border: 2px solid #ffffff;
+  color: #ee8207;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: auto;
+  min-width: 120px;
+  padding: 0.5rem 0.75rem;
+}
+
+.board-edit-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #ee8207;
+}
+
+.board-edit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
