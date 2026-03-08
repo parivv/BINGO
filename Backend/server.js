@@ -296,6 +296,61 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+app.put("/api/profile/username", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  const nextName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  if (!nextName) {
+    return res.status(400).json({ error: "Username is required." });
+  }
+
+  const { data: existingUser, error: existingErr } = await supabase
+    .from("users")
+    .select("id")
+    .eq("name", nextName)
+    .maybeSingle();
+
+  if (existingErr) {
+    return res.status(500).json({ error: existingErr.message });
+  }
+
+  if (existingUser && existingUser.id !== userId) {
+    return res.status(400).json({ error: "Username already in use" });
+  }
+
+  const { data: updatedUser, error: updateErr } = await supabase
+    .from("users")
+    .update({ name: nextName })
+    .eq("id", userId)
+    .select("*")
+    .single();
+
+  if (updateErr || !updatedUser) {
+    return res.status(500).json({ error: updateErr?.message || "Could not update username." });
+  }
+
+  const { error: groupMemberErr } = await supabase
+    .from("group_members")
+    .update({ user_name: nextName })
+    .eq("user_id", userId);
+
+  if (groupMemberErr) {
+    return res.status(500).json({ error: groupMemberErr.message });
+  }
+
+  req.login(updatedUser, (loginErr) => {
+    if (loginErr) {
+      return res.status(500).json({ error: "Could not refresh session user." });
+    }
+
+    return res.json({ user: updatedUser });
+  });
+});
+
 function generateGroupCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";

@@ -365,6 +365,15 @@ async function deleteBoardApi(boardId) {
   });
 }
 
+async function updateUsernameApi(name) {
+  const payload = await apiRequest("/api/profile/username", {
+    method: "PUT",
+    body: JSON.stringify({ name })
+  });
+
+  return normalizeUser(payload.user);
+}
+
 async function fetchGroupsApi() {
   const payload = await apiRequest("/api/groups", { method: "GET" });
   const groups = Array.isArray(payload.groups) ? payload.groups : [];
@@ -792,6 +801,7 @@ function DashboardPage({ user, setUser }) {
   const [deletingGroupId, setDeletingGroupId] = useState(null);
   const [deletePopupGroup, setDeletePopupGroup] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -1286,6 +1296,51 @@ function DashboardPage({ user, setUser }) {
     navigate("/");
   }
 
+  async function editUsername() {
+    if (isUpdatingUsername) {
+      return;
+    }
+
+    const inputName = window.prompt("Enter your new username:", user.name || "");
+    if (inputName === null) {
+      return;
+    }
+
+    const trimmedName = inputName.trim();
+    if (!trimmedName) {
+      setGroupNotice("Username cannot be empty.");
+      return;
+    }
+
+    if (trimmedName === user.name) {
+      return;
+    }
+
+    try {
+      setIsUpdatingUsername(true);
+      const updatedUser = await updateUsernameApi(trimmedName);
+      if (!updatedUser) {
+        throw new Error("Could not update username.");
+      }
+
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setGroups((previous) =>
+        previous.map((group) => ({
+          ...group,
+          members: group.members.map((member) =>
+            member.id === updatedUser.id ? { ...member, name: updatedUser.name } : member
+          )
+        }))
+      );
+      setGroupNotice("Username updated.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not update username.");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  }
+
   return (
     <>
       <AmbientBackground />
@@ -1575,14 +1630,14 @@ function DashboardPage({ user, setUser }) {
                             aria-label={index === FREE_SPACE_INDEX ? "Free space" : `Optional tally target for goal ${index + 1}`}
                           />
                         </div>
-                        <input
+                        <textarea
                           id={`goal-input-${index}`}
                           className="goal-input"
-                          type="text"
                           value={goal}
                           onChange={(event) => updateDraftGoal(index, event.target.value)}
                           placeholder={index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`}
                           readOnly={index === FREE_SPACE_INDEX}
+                          rows={3}
                         />
                       </div>
                     ))}
@@ -1724,7 +1779,12 @@ function DashboardPage({ user, setUser }) {
             </div>
 
             <div className="empty-state">
-              <h2>{user.name}</h2>
+              <div className="profile-name-row">
+                <h2>{user.name}</h2>
+                <button className="btn btn-outline" type="button" onClick={editUsername} disabled={isUpdatingUsername}>
+                  {isUpdatingUsername ? "Saving..." : "Edit Username"}
+                </button>
+              </div>
               <p>Total boards: {boards.length}</p>
               <p>Average progress: {yourProgress}%</p>
             </div>
