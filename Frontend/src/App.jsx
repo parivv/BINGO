@@ -241,6 +241,46 @@ function normalizeUser(rawUser) {
   };
 }
 
+function calculateBestFiveInARowProgress(goals) {
+  if (!Array.isArray(goals) || goals.length !== FIXED_GOAL_COUNT) {
+    return 20; // Start at 20% (free space)
+  }
+
+  // Define all possible winning lines (rows, columns, diagonals)
+  const rows = [
+    [0, 1, 2, 3, 4],
+    [5, 6, 7, 8, 9],
+    [10, 11, 12, 13, 14],
+    [15, 16, 17, 18, 19],
+    [20, 21, 22, 23, 24]
+  ];
+
+  const columns = [
+    [0, 5, 10, 15, 20],
+    [1, 6, 11, 16, 21],
+    [2, 7, 12, 17, 22],
+    [3, 8, 13, 18, 23],
+    [4, 9, 14, 19, 24]
+  ];
+
+  const diagonals = [
+    [0, 6, 12, 18, 24],
+    [4, 8, 12, 16, 20]
+  ];
+
+  const allLines = [...rows, ...columns, ...diagonals];
+
+  // Find the line with the highest completion percentage
+  let maxProgress = 0;
+  for (const line of allLines) {
+    const completedCount = line.filter(index => goals[index] && goals[index].completed).length;
+    const lineProgress = (completedCount / 5) * 100;
+    maxProgress = Math.max(maxProgress, lineProgress);
+  }
+
+  return Math.round(maxProgress);
+}
+
 function calculateProgressFromBoards(boards) {
   if (!Array.isArray(boards) || boards.length === 0) {
     return 0;
@@ -248,10 +288,31 @@ function calculateProgressFromBoards(boards) {
 
   return Math.round(
     boards.reduce((sum, board) => {
-      const completed = Array.isArray(board.goals)
-        ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
-        : board.completed;
-      return sum + Math.round((completed / TRACKED_GOAL_COUNT) * 100);
+      let boardProgress = 0;
+      const gameType = board.gameType || "five-in-a-row";
+      
+      if (gameType === "five-in-a-row") {
+        // For 5-in-a-row, find the best possible line completion
+        if (Array.isArray(board.goals)) {
+          boardProgress = calculateBestFiveInARowProgress(board.goals);
+        } else {
+          boardProgress = 20; // Start at 20% (free space)
+        }
+      } else if (gameType === "blackout") {
+        // For blackout, progress is based on completing all 24 tiles
+        const completed = Array.isArray(board.goals)
+          ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+          : board.completed;
+        boardProgress = (completed / TRACKED_GOAL_COUNT) * 100;
+      } else {
+        // Fallback
+        const completed = Array.isArray(board.goals)
+          ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+          : board.completed;
+        boardProgress = (completed / TRACKED_GOAL_COUNT) * 100;
+      }
+      
+      return sum + Math.round(boardProgress);
     }, 0) / boards.length
   );
 }
@@ -1550,7 +1611,22 @@ function DashboardPage({ user, setUser }) {
                 const completedGoals = Array.isArray(board.goals)
                   ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
                   : board.completed;
-                const completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                
+                let completionPercent = 0;
+                const gameType = board.gameType || "five-in-a-row";
+                if (gameType === "five-in-a-row") {
+                  // For 5-in-a-row, find the best possible line completion
+                  if (Array.isArray(board.goals)) {
+                    completionPercent = calculateBestFiveInARowProgress(board.goals);
+                  } else {
+                    completionPercent = 20; // Start at 20% (free space)
+                  }
+                } else if (gameType === "blackout") {
+                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                } else {
+                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                }
+                
                 const boardColor = board.boardColor || "#c10b3c";
                 const tileShape = board.tileShape || "rounded";
                 const gameTypeLabel = board.gameType === "blackout" ? "Blackout" : "5-in-a-Row";
