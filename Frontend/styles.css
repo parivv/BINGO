@@ -502,6 +502,17 @@ p {
   padding: 1.1rem;
 }
 
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
 .create-board-form {
   background: var(--paper);
   border: 1px dashed var(--stroke);
@@ -511,14 +522,181 @@ p {
   padding: 1.1rem;
 }
 
+.create-wizard {
+  gap: 1rem;
+}
+
+.create-stepbar {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.create-step-pill {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow: hidden;
+  padding: 0;
+  text-indent: -9999px;
+  white-space: nowrap;
+  width: 100%;
+  height: 8px;
+  background: rgba(52, 32, 32, 0.15);
+}
+
+.create-step-pill.is-active,
+.create-step-pill.is-complete {
+  background: #ee8207;
+}
+
+.create-step-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .create-help {
   font-size: 0.9rem;
+}
+
+.game-type-options {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.game-type-card {
+  background: rgba(244, 249, 233, 0.9);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  text-align: left;
+}
+
+.game-type-card.is-selected {
+  background: var(--accent);
+  color: #f4f9e9;
+}
+
+.game-type-card strong {
+  font-size: 1rem;
+}
+
+.game-type-card span {
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .create-goal-grid {
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.customize-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.customize-group h3 {
+  font-size: 0.98rem;
+}
+
+.color-options {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.color-option {
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  height: 44px;
+}
+
+.color-option.is-selected {
+  border-color: var(--ink);
+}
+
+.shape-options {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shape-option {
+  align-items: center;
+  background: rgba(244, 249, 233, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  padding: 0.65rem 0.45rem;
+}
+
+.shape-option.is-selected {
+  background: rgba(193, 11, 60, 0.1);
+  border-color: var(--ink);
+}
+
+.shape-option span {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.shape-preview {
+  background: #111;
+  display: block;
+  height: 22px;
+  width: 22px;
+}
+
+.shape-rounded {
+  border-radius: 6px;
+}
+
+.shape-square {
+  border-radius: 0;
+}
+
+.shape-circle {
+  border-radius: 999px;
+}
+
+.preview-strip {
+  background: rgba(193, 11, 60, 0.08);
+  border: 4px solid var(--accent);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 0.5rem;
+}
+
+.preview-tile {
+  aspect-ratio: 1 / 1;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(52, 32, 32, 0.22);
+}
+
+.create-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.3rem;
+}
+
+.create-actions .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .goal-input-cell {
