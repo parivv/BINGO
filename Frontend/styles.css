@@ -676,6 +676,26 @@ p {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.goal-ai-controls {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.goal-ai-controls .field-input {
+  min-width: 0;
+}
+
+.goal-ai-actions {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.goal-ai-actions .btn {
+  white-space: nowrap;
+}
+
 .customize-group {
   display: grid;
   gap: 0.55rem;
@@ -1293,6 +1313,14 @@ p {
   .create-goal-grid,
   .bingo-grid {
     gap: 0.38rem;
+  }
+
+  .goal-ai-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-ai-actions .btn {
+    width: 100%;
   }
 
   .goal-input-cell,

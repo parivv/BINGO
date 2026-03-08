@@ -331,6 +331,15 @@ async function createBoardApi(boardDraft) {
   return normalizeBoard(payload.board);
 }
 
+async function suggestGoalsApi(input) {
+  const payload = await apiRequest("/api/goals/suggest", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+
+  return Array.isArray(payload.suggestions) ? payload.suggestions : [];
+}
+
 async function updateBoardApi(board) {
   const payload = await apiRequest(`/api/boards/${board.id}`, {
     method: "PUT",
@@ -744,6 +753,10 @@ function DashboardPage({ user, setUser }) {
   const [draftGameType, setDraftGameType] = useState("five-in-a-row");
   const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
   const [draftTallies, setDraftTallies] = useState(() => createDraftTallies());
+  const [goalSuggestionTheme, setGoalSuggestionTheme] = useState("health, learning, and productivity");
+  const [goalSuggestionTone, setGoalSuggestionTone] = useState("practical");
+  const [goalSuggestionDifficulty, setGoalSuggestionDifficulty] = useState("mixed");
+  const [isSuggestingGoals, setIsSuggestingGoals] = useState(false);
   const [groups, setGroups] = useState([]);
   const [groupLeaderboards, setGroupLeaderboards] = useState([]);
   const [newGroupName, setNewGroupName] = useState("");
@@ -866,6 +879,9 @@ function DashboardPage({ user, setUser }) {
     setDraftGameType("five-in-a-row");
     setDraftGoals(createDraftGoals());
     setDraftTallies(createDraftTallies());
+    setGoalSuggestionTheme("health, learning, and productivity");
+    setGoalSuggestionTone("practical");
+    setGoalSuggestionDifficulty("mixed");
     setDraftBoardColor("#c10b3c");
     setDraftTileShape("rounded");
   }
@@ -945,6 +961,85 @@ function DashboardPage({ user, setUser }) {
 
     resetCreateDraft();
     setActiveTab("dashboard");
+  }
+
+  async function generateGoalSuggestions(mode = "all") {
+    if (isSuggestingGoals) {
+      return;
+    }
+
+    const allTargetIndexes = Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => index)
+      .filter((index) => index !== FREE_SPACE_INDEX);
+
+    const targetIndexes = mode === "empty"
+      ? allTargetIndexes.filter((index) => {
+        const currentText = typeof draftGoals[index] === "string" ? draftGoals[index].trim() : "";
+        return !currentText;
+      })
+      : allTargetIndexes;
+
+    if (targetIndexes.length === 0) {
+      setGroupNotice("No empty goal tiles to fill.");
+      return;
+    }
+
+    setIsSuggestingGoals(true);
+    setGroupNotice("");
+
+    try {
+      const existingGoals = mode === "empty"
+        ? allTargetIndexes
+            .map((index) => (typeof draftGoals[index] === "string" ? draftGoals[index].trim() : ""))
+            .filter(Boolean)
+        : [];
+
+      const suggestions = await suggestGoalsApi({
+        theme: goalSuggestionTheme,
+        tone: goalSuggestionTone,
+        difficulty: goalSuggestionDifficulty,
+        count: targetIndexes.length,
+        existingGoals
+      });
+
+      if (suggestions.length === 0) {
+        setGroupNotice("AI did not return suggestions. Try adjusting the theme.");
+        return;
+      }
+
+      let insertedCount = 0;
+      setDraftGoals((previous) => {
+        const next = [...previous];
+
+        targetIndexes.forEach((index, suggestionOffset) => {
+          const suggestion = suggestions[suggestionOffset];
+          if (!suggestion) {
+            return;
+          }
+
+          next[index] = suggestion;
+          insertedCount += 1;
+        });
+
+        return next;
+      });
+
+      if (insertedCount === 0) {
+        setGroupNotice("AI returned output, but no usable goals were found. Try a different theme.");
+        return;
+      }
+
+      const actionLabel = mode === "empty" ? "Filled" : "Added";
+      const shortfall = targetIndexes.length - insertedCount;
+      if (shortfall > 0) {
+        setGroupNotice(`${actionLabel} ${insertedCount} AI goal suggestion${insertedCount === 1 ? "" : "s"}. ${shortfall} tile${shortfall === 1 ? "" : "s"} still need text.`);
+      } else {
+        setGroupNotice(`${actionLabel} ${insertedCount} AI goal suggestion${insertedCount === 1 ? "" : "s"}.`);
+      }
+    } catch (error) {
+      setGroupNotice(error.message || "Could not generate AI goal suggestions.");
+    } finally {
+      setIsSuggestingGoals(false);
+    }
   }
 
   async function createGroup(event) {
@@ -1229,6 +1324,7 @@ function DashboardPage({ user, setUser }) {
                 if a goal needs to be done more than once, enter the required number there so you can track exactly how far along you
                 are on your dashboard.
               </p>
+              <p className="group-notice" role="status" hidden={!groupNotice}>{groupNotice}</p>
             </div>
 
             <div className="create-board-form create-wizard">
@@ -1295,6 +1391,57 @@ function DashboardPage({ user, setUser }) {
               {createStep === 3 && (
                 <div className="create-step-panel">
                   <p className="create-help">Add your goals to each tile. Center tile is always FREE SPACE.</p>
+
+                  <div className="goal-ai-controls" aria-label="AI goal suggestion controls">
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={goalSuggestionTheme}
+                      onChange={(event) => setGoalSuggestionTheme(event.target.value)}
+                      placeholder="Theme for suggestions"
+                      maxLength={80}
+                    />
+
+                    <select
+                      className="field-input"
+                      value={goalSuggestionTone}
+                      onChange={(event) => setGoalSuggestionTone(event.target.value)}
+                    >
+                      <option value="practical">Practical</option>
+                      <option value="ambitious">Ambitious</option>
+                      <option value="fun">Fun</option>
+                    </select>
+
+                    <select
+                      className="field-input"
+                      value={goalSuggestionDifficulty}
+                      onChange={(event) => setGoalSuggestionDifficulty(event.target.value)}
+                    >
+                      <option value="easy">Easy</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="hard">Hard</option>
+                    </select>
+
+                    <div className="goal-ai-actions">
+                      <button
+                        className="btn btn-accent"
+                        type="button"
+                        onClick={() => generateGoalSuggestions("all")}
+                        disabled={isSuggestingGoals}
+                      >
+                        {isSuggestingGoals ? "Generating..." : "Generate with AI"}
+                      </button>
+
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => generateGoalSuggestions("empty")}
+                        disabled={isSuggestingGoals}
+                      >
+                        Fill Empty Only
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="create-goal-grid" aria-label="Create board goals">
                     {draftGoals.map((goal, index) => (

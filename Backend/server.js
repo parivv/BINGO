@@ -3,6 +3,7 @@ const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
@@ -70,6 +71,11 @@ const PORT = process.env.PORT || 8000;
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
+const MAX_AI_SUGGESTIONS = FIXED_GOAL_COUNT - 1;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const geminiClient = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
 const ALLOWED_GAME_TYPES = new Set(["five-in-a-row", "blackout"]);
 const ALLOWED_TILE_SHAPES = new Set(["rounded", "square", "circle"]);
 
@@ -621,6 +627,120 @@ function normalizeBoardPayload(body) {
     }
   };
 }
+
+function parseJsonArrayFromModelText(text) {
+  const asText = typeof text === "string" ? text : "";
+  const cleaned = asText.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  const firstBracket = cleaned.indexOf("[");
+  const lastBracket = cleaned.lastIndexOf("]");
+  if (firstBracket < 0 || lastBracket <= firstBracket) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cleaned.slice(firstBracket, lastBracket + 1));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function parseSuggestionLinesFromModelText(text) {
+  const rawText = typeof text === "string" ? text : "";
+  return rawText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*\d.)]+\s*/, "").trim())
+    .map((line) => line.replace(/^"|"$/g, ""))
+    .filter(Boolean);
+}
+
+function normalizeSuggestionText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 55);
+}
+
+app.post("/api/goals/suggest", requireAuth, async (req, res) => {
+  if (!geminiClient) {
+    return res.status(503).json({
+      error: "Gemini is not configured. Set GEMINI_API_KEY in Backend/.env."
+    });
+  }
+
+  const theme = typeof req.body?.theme === "string" ? req.body.theme.trim() : "personal growth";
+  const tone = typeof req.body?.tone === "string" ? req.body.tone.trim() : "practical";
+  const difficulty = typeof req.body?.difficulty === "string" ? req.body.difficulty.trim() : "mixed";
+  const countInput = Number.parseInt(req.body?.count, 10);
+  const count = Number.isFinite(countInput)
+    ? Math.max(1, Math.min(MAX_AI_SUGGESTIONS, countInput))
+    : MAX_AI_SUGGESTIONS;
+
+  const existingGoals = Array.isArray(req.body?.existingGoals)
+    ? req.body.existingGoals
+        .map(normalizeSuggestionText)
+        .filter(Boolean)
+        .slice(0, MAX_AI_SUGGESTIONS)
+    : [];
+
+  const safeTheme = theme.slice(0, 80) || "personal growth";
+  const safeTone = tone.slice(0, 40) || "practical";
+  const safeDifficulty = difficulty.slice(0, 40) || "mixed";
+
+  const prompt = [
+    `Generate ${count} unique bingo goal ideas.`,
+    `Theme: ${safeTheme}`,
+    `Tone: ${safeTone}`,
+    `Difficulty: ${safeDifficulty}`,
+    `Goals to avoid repeating: ${JSON.stringify(existingGoals)}`,
+    "Rules:",
+    "- Return ONLY valid JSON array of strings.",
+    "- Each goal must be short (max 55 characters).",
+    "- Action-oriented and specific.",
+    "- Keep content safe and non-harmful."
+  ].join("\n");
+
+  try {
+    const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
+    const result = await model.generateContent(prompt);
+    const rawText = result?.response?.text ? result.response.text() : "";
+    const parsed = parseJsonArrayFromModelText(rawText);
+    const candidateItems = Array.isArray(parsed)
+      ? parsed
+      : parseSuggestionLinesFromModelText(rawText);
+
+    if (!Array.isArray(candidateItems) || candidateItems.length === 0) {
+      return res.status(502).json({ error: "Gemini response did not include usable suggestions." });
+    }
+
+    const existingSet = new Set(existingGoals.map((goal) => goal.toLowerCase()));
+    const seen = new Set();
+    const suggestions = [];
+
+    for (const item of candidateItems) {
+      const text = normalizeSuggestionText(item);
+      const lowered = text.toLowerCase();
+      if (!text || existingSet.has(lowered) || seen.has(lowered) || text === FREE_SPACE_TEXT) {
+        continue;
+      }
+
+      seen.add(lowered);
+      suggestions.push(text);
+      if (suggestions.length >= count) {
+        break;
+      }
+    }
+
+    return res.json({ suggestions });
+  } catch (error) {
+    return res.status(500).json({
+      error: error?.message || "Failed to generate AI goal suggestions."
+    });
+  }
+});
 
 app.get("/api/boards", requireAuth, async (req, res) => {
   const userId = req.user?.id;
