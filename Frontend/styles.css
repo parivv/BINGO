@@ -719,8 +719,9 @@ p {
   }
 
   .dashboard-topbar .brand {
-    display: block;
+    display: inline-flex;
     flex: 1 0 100%;
+    justify-content: center;
     text-align: center;
   }
 
