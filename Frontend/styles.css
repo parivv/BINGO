@@ -929,6 +929,27 @@ p {
   font-size: 1.06rem;
 }
 
+.board-card-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: space-between;
+}
+
+.board-game-type {
+  background: rgba(244, 249, 233, 0.2);
+  border: 1px solid rgba(244, 249, 233, 0.56);
+  border-radius: 999px;
+  color: #f4f9e9;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .progress-row {
   align-items: center;
   display: flex;
@@ -1014,6 +1035,51 @@ p {
   font-size: 0.92rem;
   font-weight: 700;
   min-height: 1.2em;
+}
+
+.win-popup-backdrop {
+  align-items: center;
+  background: rgba(52, 32, 32, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1.25rem;
+  position: fixed;
+  z-index: 1200;
+}
+
+.win-popup {
+  background: #f4f9e9;
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 16px 42px rgba(52, 32, 32, 0.28);
+  color: var(--ink);
+  display: grid;
+  gap: 0.7rem;
+  max-width: 420px;
+  padding: 1.2rem;
+  text-align: center;
+  width: 100%;
+}
+
+.win-popup h2 {
+  color: var(--accent);
+  font-size: 1.55rem;
+  margin: 0;
+}
+
+.win-popup p {
+  margin: 0;
+}
+
+.win-popup-board {
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.win-popup .btn {
+  justify-self: center;
+  min-width: 130px;
 }
 
 .group-list {

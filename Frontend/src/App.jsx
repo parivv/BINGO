@@ -76,6 +76,52 @@ function lightenHex(hexColor, ratio = 0.3) {
   return `rgb(${tintChannel(rgb.r)}, ${tintChannel(rgb.g)}, ${tintChannel(rgb.b)})`;
 }
 
+function areAllTilesComplete(goals, indices) {
+  return indices.every((index) => Boolean(goals[index]?.completed));
+}
+
+function hasFiveInARow(goals) {
+  if (!Array.isArray(goals) || goals.length < FIXED_GOAL_COUNT) {
+    return false;
+  }
+
+  for (let row = 0; row < 5; row += 1) {
+    const rowIndices = Array.from({ length: 5 }, (_, offset) => row * 5 + offset);
+    if (areAllTilesComplete(goals, rowIndices)) {
+      return true;
+    }
+  }
+
+  for (let column = 0; column < 5; column += 1) {
+    const columnIndices = Array.from({ length: 5 }, (_, offset) => column + offset * 5);
+    if (areAllTilesComplete(goals, columnIndices)) {
+      return true;
+    }
+  }
+
+  const leftToRightDiagonal = [0, 6, 12, 18, 24];
+  const rightToLeftDiagonal = [4, 8, 12, 16, 20];
+  return areAllTilesComplete(goals, leftToRightDiagonal) || areAllTilesComplete(goals, rightToLeftDiagonal);
+}
+
+function hasBoardBeenBeaten(board) {
+  if (!board || !Array.isArray(board.goals) || board.goals.length < FIXED_GOAL_COUNT) {
+    return false;
+  }
+
+  return board.gameType === "blackout"
+    ? board.goals.every((goal) => Boolean(goal.completed))
+    : hasFiveInARow(board.goals);
+}
+
+function getWinMessage(board) {
+  if (board?.gameType === "blackout") {
+    return "Blackout complete. Every tile is checked off.";
+  }
+
+  return "You achieved 5 goals in a row. Yippee!";
+}
+
 function createDraftGoals() {
   return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) =>
     index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : ""
@@ -704,6 +750,7 @@ function DashboardPage({ user, setUser }) {
   const [assignmentDraftByGroup, setAssignmentDraftByGroup] = useState({});
   const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
   const [draftTileShape, setDraftTileShape] = useState("rounded");
+  const [winPopup, setWinPopup] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -996,12 +1043,24 @@ function DashboardPage({ user, setUser }) {
       completed: goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
     };
 
+    const wasBeaten = hasBoardBeenBeaten(currentBoard);
+    const isNowBeaten = hasBoardBeenBeaten(optimisticBoard);
+
     setBoards((previous) => previous.map((board) => (board.id === boardId ? optimisticBoard : board)));
 
     try {
       const updated = await updateBoardApi(optimisticBoard);
+      const persistedBoard = updated || optimisticBoard;
       if (updated) {
         setBoards((previous) => previous.map((board) => (board.id === boardId ? updated : board)));
+      }
+
+      if (!wasBeaten && isNowBeaten) {
+        setWinPopup({
+          boardId,
+          title: persistedBoard.title || "Board Complete",
+          message: getWinMessage(persistedBoard)
+        });
       }
     } catch (_error) {
       setBoards((previous) => previous.map((board) => (board.id === boardId ? currentBoard : board)));
@@ -1101,6 +1160,7 @@ function DashboardPage({ user, setUser }) {
                 const completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
                 const boardColor = board.boardColor || "#c10b3c";
                 const tileShape = board.tileShape || "rounded";
+                const gameTypeLabel = board.gameType === "blackout" ? "Blackout" : "5-in-a-Row";
                 const completedTileBackground = lightenHex(boardColor, 0.38);
                 const completedTileBorder = lightenHex(boardColor, 0.24);
                 return (
@@ -1113,7 +1173,10 @@ function DashboardPage({ user, setUser }) {
                       color: "#f4f9e9"
                     }}
                   >
-                    <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
+                    <div className="board-card-head">
+                      <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
+                      <span className="board-game-type" aria-label={`Game type: ${gameTypeLabel}`}>{gameTypeLabel}</span>
+                    </div>
                     <div className="progress-row">
                       <span>
                         {completedGoals} of {TRACKED_GOAL_COUNT} goals complete
@@ -1159,7 +1222,11 @@ function DashboardPage({ user, setUser }) {
           <section className="view-panel" aria-labelledby="createTitle">
             <div className="panel-head">
               <h1 id="createTitle">Create a New Board</h1>
-              <p>Follow each step to build your board setup.</p>
+              <p>
+                Follow each step to build your board setup. The small blank in the top-right of each tile is an optional tally target:
+                if a goal needs to be done more than once, enter the required number there so you can track exactly how far along you
+                are on your dashboard.
+              </p>
             </div>
 
             <div className="create-board-form create-wizard">
@@ -1504,6 +1571,25 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
       </main>
+
+      {winPopup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={() => setWinPopup(null)}>
+          <section
+            className="win-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="winPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="winPopupTitle">Board Beat!</h2>
+            <p className="win-popup-board">{winPopup.title}</p>
+            <p>{winPopup.message}</p>
+            <button className="btn btn-primary" type="button" onClick={() => setWinPopup(null)}>
+              Awesome
+            </button>
+          </section>
+        </div>
+      )}
 
       <AppFooter />
     </>
