@@ -12,7 +12,8 @@ import hadiyaHeadshot from "../Hadiya_Headshot.jpg";
 import colinHeadshot from "../Colin_Headshot.jpg";
 
 const STORAGE_KEYS = {
-  user: "bingo-battles.user"
+  user: "bingo-battles.user",
+  boardOrderPrefix: "bingo-battles.board-order"
 };
 
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
@@ -440,6 +441,54 @@ function readUser() {
   }
 }
 
+function getBoardOrderStorageKey(userId) {
+  return `${STORAGE_KEYS.boardOrderPrefix}.${userId}`;
+}
+
+function readBoardOrder(userId) {
+  if (!userId) {
+    return [];
+  }
+
+  const raw = localStorage.getItem(getBoardOrderStorageKey(userId));
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function sortBoardsBySavedOrder(boards, savedOrder) {
+  if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(savedOrder) || savedOrder.length === 0) {
+    return boards;
+  }
+
+  const orderMap = new Map(savedOrder.map((id, index) => [id, index]));
+  return [...boards].sort((left, right) => {
+    const leftIndex = orderMap.get(left.id);
+    const rightIndex = orderMap.get(right.id);
+
+    if (leftIndex === undefined && rightIndex === undefined) {
+      return 0;
+    }
+
+    if (leftIndex === undefined) {
+      return 1;
+    }
+
+    if (rightIndex === undefined) {
+      return -1;
+    }
+
+    return leftIndex - rightIndex;
+  });
+}
+
 function AmbientBackground() {
   return (
     <div className="ambient-bg" aria-hidden="true">
@@ -808,6 +857,7 @@ function DashboardPage({ user, setUser }) {
   const [memberBoardsPopup, setMemberBoardsPopup] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [draggedBoardId, setDraggedBoardId] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -816,7 +866,8 @@ function DashboardPage({ user, setUser }) {
       try {
         const apiBoards = await fetchBoardsApi();
         if (isMounted) {
-          setBoards(apiBoards);
+          const savedOrder = readBoardOrder(user.id);
+          setBoards(sortBoardsBySavedOrder(apiBoards, savedOrder));
         }
       } catch (error) {
         if (isMounted) {
@@ -831,6 +882,11 @@ function DashboardPage({ user, setUser }) {
       isMounted = false;
     };
   }, [user.id]);
+
+  useEffect(() => {
+    const orderedIds = boards.map((board) => board.id);
+    localStorage.setItem(getBoardOrderStorageKey(user.id), JSON.stringify(orderedIds));
+  }, [boards, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1345,6 +1401,36 @@ function DashboardPage({ user, setUser }) {
     navigate("/");
   }
 
+  function handleBoardDragStart(boardId) {
+    setDraggedBoardId(boardId);
+  }
+
+  function handleBoardDragEnd() {
+    setDraggedBoardId(null);
+  }
+
+  function handleBoardDrop(targetBoardId) {
+    if (!draggedBoardId || draggedBoardId === targetBoardId) {
+      setDraggedBoardId(null);
+      return;
+    }
+
+    setBoards((previous) => {
+      const sourceIndex = previous.findIndex((board) => board.id === draggedBoardId);
+      const targetIndex = previous.findIndex((board) => board.id === targetBoardId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return previous;
+      }
+
+      const reordered = [...previous];
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      return reordered;
+    });
+
+    setDraggedBoardId(null);
+  }
+
   async function editUsername() {
     if (isUpdatingUsername) {
       return;
@@ -1472,8 +1558,13 @@ function DashboardPage({ user, setUser }) {
                 const completedTileBorder = lightenHex(boardColor, 0.24);
                 return (
                   <article
-                    className="board-card"
+                    className={`board-card ${draggedBoardId === board.id ? "is-dragging" : ""}`}
                     key={board.id}
+                    draggable
+                    onDragStart={() => handleBoardDragStart(board.id)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => handleBoardDrop(board.id)}
+                    onDragEnd={handleBoardDragEnd}
                     style={{
                       backgroundColor: boardColor,
                       borderColor: boardColor,

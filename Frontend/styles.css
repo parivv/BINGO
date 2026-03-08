@@ -897,9 +897,18 @@ p {
   background: var(--paper);
   border: 1px solid var(--stroke);
   border-radius: 16px;
+  cursor: grab;
   display: grid;
   gap: 0.7rem;
   padding: 0.95rem;
+}
+
+.board-card:active {
+  cursor: grabbing;
+}
+
+.board-card.is-dragging {
+  opacity: 0.74;
 }
 
 .bingo-grid {
