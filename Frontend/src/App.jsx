@@ -404,7 +404,7 @@ function LandingPage({ user }) {
           <h2 id="cta-title">Ready to Erupt?</h2>
           <p>Use Bingo Battles to transform your goals into reality.</p>
           <button className="btn btn-accent btn-lg" type="button" onClick={() => navigate("/signup")}>
-            Start Your Battle
+            Create Your First Board
           </button>
         </section>
       </main>
