@@ -33,6 +33,7 @@ body {
   letter-spacing: 0.01em;
   background: #D9B4A7;
   min-height: 100vh;
+  scrollbar-gutter: stable;
   position: relative;
 }
 

@@ -1733,7 +1733,8 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
                     completionPercent = 20; // Start at 20% (free space)
                   }
                 } else if (gameType === "blackout") {
-                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                  const blackoutCompleted = Math.min(FIXED_GOAL_COUNT, completedGoals + 1);
+                  completionPercent = Math.round((blackoutCompleted / FIXED_GOAL_COUNT) * 100);
                 } else {
                   completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
                 }
