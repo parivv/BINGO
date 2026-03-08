@@ -659,6 +659,62 @@ app.get("/api/groups/:groupId/leaderboard", requireAuth, async (req, res) => {
   return res.json({ entries });
 });
 
+app.get("/api/groups/:groupId/members/:memberId/boards", requireAuth, async (req, res) => {
+  const { groupId, memberId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: requesterMembership, error: requesterMembershipError } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (requesterMembershipError) {
+    return res.status(500).json({ error: requesterMembershipError.message });
+  }
+
+  if (!requesterMembership) {
+    return res.status(403).json({ error: "Not a member of this group." });
+  }
+
+  const { data: targetMembership, error: targetMembershipError } = await supabase
+    .from("group_members")
+    .select("id, assigned_board_id")
+    .eq("group_id", groupId)
+    .eq("user_id", memberId)
+    .maybeSingle();
+
+  if (targetMembershipError) {
+    return res.status(500).json({ error: targetMembershipError.message });
+  }
+
+  if (!targetMembership) {
+    return res.status(404).json({ error: "User is not a member of this group." });
+  }
+
+  if (!targetMembership.assigned_board_id) {
+    return res.json({ boards: [] });
+  }
+
+  const { data: assignedBoard, error: boardsError } = await supabase
+    .from("boards")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
+    .eq("id", targetMembership.assigned_board_id)
+    .eq("user_id", memberId)
+    .maybeSingle();
+
+  if (boardsError) {
+    return res.status(500).json({ error: boardsError.message });
+  }
+
+  return res.json({ boards: assignedBoard ? [assignedBoard] : [] });
+});
+
 function normalizeGoals(rawGoals) {
   const source = Array.isArray(rawGoals) ? rawGoals : [];
 

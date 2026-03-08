@@ -1206,6 +1206,120 @@ p {
   font-weight: 700;
 }
 
+.leaderboard-name-btn {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.leaderboard-name-btn:hover {
+  color: var(--ink);
+}
+
+.member-boards-popup {
+  max-width: 620px;
+  text-align: left;
+}
+
+.member-board-list {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.member-board-card {
+  margin: 0;
+}
+
+.member-board-card h3 {
+  margin: 0;
+}
+
+.member-board-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.member-board-type-pill {
+  background: rgba(193, 11, 60, 0.12);
+  border: 1px solid rgba(193, 11, 60, 0.35);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.18rem 0.45rem;
+  text-transform: uppercase;
+}
+
+.member-board-color {
+  align-items: center;
+  display: inline-flex;
+  gap: 0;
+}
+
+.member-board-color-swatch {
+  border: 1px solid rgba(52, 32, 32, 0.28);
+  border-radius: 999px;
+  display: inline-block;
+  height: 0.9rem;
+  width: 0.9rem;
+}
+
+.member-board-grid {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.member-readonly-cell {
+  cursor: default;
+}
+
+.member-readonly-cell:hover {
+  transform: none;
+}
+
+.member-board-cell {
+  align-items: center;
+  aspect-ratio: 1 / 1;
+  background: rgba(244, 249, 233, 0.88);
+  border: 1px solid var(--stroke);
+  color: var(--ink);
+  display: flex;
+  font-size: 0.56rem;
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1.15;
+  padding: 0.18rem;
+  text-align: center;
+}
+
+.member-board-cell.shape-rounded {
+  border-radius: 8px;
+}
+
+.member-board-cell.shape-square {
+  border-radius: 0;
+}
+
+.member-board-cell.shape-circle {
+  border-radius: 999px;
+}
+
+.member-board-cell.is-done {
+  background: var(--done-bg, #f7c3d1);
+  border-color: var(--done-border, #ef98b1);
+}
+
 .site-footer {
   background: #342020;
   margin-top: 60px;

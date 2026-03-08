@@ -413,6 +413,11 @@ async function fetchGroupLeaderboardApi(groupId) {
   return Array.isArray(payload.entries) ? payload.entries : [];
 }
 
+async function fetchGroupMemberBoardsApi(groupId, memberId) {
+  const payload = await apiRequest(`/api/groups/${groupId}/members/${memberId}/boards`, { method: "GET" });
+  return Array.isArray(payload.boards) ? payload.boards : [];
+}
+
 async function assignGroupBoardApi(groupId, boardId) {
   const payload = await apiRequest(`/api/groups/${groupId}/assignment`, {
     method: "PUT",
@@ -800,6 +805,7 @@ function DashboardPage({ user, setUser }) {
   const [deletePopupBoard, setDeletePopupBoard] = useState(null);
   const [deletingGroupId, setDeletingGroupId] = useState(null);
   const [deletePopupGroup, setDeletePopupGroup] = useState(null);
+  const [memberBoardsPopup, setMemberBoardsPopup] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
 
@@ -1175,6 +1181,49 @@ function DashboardPage({ user, setUser }) {
       setGroupNotice(selectedBoardId ? "Assigned board to group leaderboard." : "Cleared assigned board for this group.");
     } catch (error) {
       setGroupNotice(error.message || "Could not assign board to group.");
+    }
+  }
+
+  function closeMemberBoardsPopup() {
+    setMemberBoardsPopup(null);
+  }
+
+  async function openMemberBoardsPopup(groupBoard, entry) {
+    if (!groupBoard?.id || !entry?.id) {
+      return;
+    }
+
+    setMemberBoardsPopup({
+      groupId: groupBoard.id,
+      groupName: groupBoard.name,
+      memberId: entry.id,
+      memberName: entry.name,
+      boards: [],
+      loading: true,
+      error: ""
+    });
+
+    try {
+      const boardsForMember = await fetchGroupMemberBoardsApi(groupBoard.id, entry.id);
+      setMemberBoardsPopup({
+        groupId: groupBoard.id,
+        groupName: groupBoard.name,
+        memberId: entry.id,
+        memberName: entry.name,
+        boards: boardsForMember,
+        loading: false,
+        error: ""
+      });
+    } catch (error) {
+      setMemberBoardsPopup({
+        groupId: groupBoard.id,
+        groupName: groupBoard.name,
+        memberId: entry.id,
+        memberName: entry.name,
+        boards: [],
+        loading: false,
+        error: error.message || "Could not load member boards."
+      });
     }
   }
 
@@ -1758,7 +1807,15 @@ function DashboardPage({ user, setUser }) {
                       {groupBoard.entries.map((entry, index) => (
                         <tr key={`${groupBoard.id}-${entry.id}`} className={entry.isSelf ? "self" : ""}>
                           <td>{index + 1}</td>
-                          <td>{entry.name}</td>
+                          <td>
+                            <button
+                              className="leaderboard-name-btn"
+                              type="button"
+                              onClick={() => openMemberBoardsPopup(groupBoard, entry)}
+                            >
+                              {entry.name}
+                            </button>
+                          </td>
                           <td>{entry.assignedBoardTitle || "Not assigned"}</td>
                           <td>{entry.progress}%</td>
                         </tr>
@@ -1950,6 +2007,120 @@ function DashboardPage({ user, setUser }) {
                 {deletingGroupId ? "Deleting..." : "Delete"}
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {memberBoardsPopup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeMemberBoardsPopup}>
+          <section
+            className="win-popup member-boards-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="memberBoardsPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="memberBoardsPopupTitle">{memberBoardsPopup.memberName}'s Assigned Board</h2>
+            <p>Group: {memberBoardsPopup.groupName}</p>
+
+            {memberBoardsPopup.loading && <p>Loading boards...</p>}
+
+            {!memberBoardsPopup.loading && memberBoardsPopup.error && (
+              <p className="group-notice">{memberBoardsPopup.error}</p>
+            )}
+
+            {!memberBoardsPopup.loading && !memberBoardsPopup.error && memberBoardsPopup.boards.length === 0 && (
+              <p>No assigned board for this user in this group.</p>
+            )}
+
+            {!memberBoardsPopup.loading && !memberBoardsPopup.error && memberBoardsPopup.boards.length > 0 && (
+              <div className="member-board-list">
+                {memberBoardsPopup.boards.map((board) => {
+                  const total = Number.isFinite(board.total) ? board.total : FIXED_GOAL_COUNT;
+                  const tracked = Math.max(1, total - 1);
+                  const completed = Number.isFinite(board.completed) ? Math.max(0, board.completed) : 0;
+                  const percent = Math.max(0, Math.min(100, Math.round((completed / tracked) * 100)));
+                  const boardType = board.game_type === "blackout" ? "Blackout" : "5-in-a-Row";
+                  const boardColor = typeof board.board_color === "string" && board.board_color.trim()
+                    ? board.board_color
+                    : "#c10b3c";
+                  const tileShape = board.shape || "rounded";
+                  const completedTileBackground = lightenHex(boardColor, 0.38);
+                  const completedTileBorder = lightenHex(boardColor, 0.24);
+                  const rawGoals = Array.isArray(board.goals) ? board.goals : [];
+                  const displayGoals = Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => {
+                    const goal = rawGoals[index];
+                    const goalText = typeof goal?.text === "string" && goal.text.trim()
+                      ? goal.text.trim()
+                      : index === FREE_SPACE_INDEX
+                        ? FREE_SPACE_TEXT
+                        : `Goal ${index + 1}`;
+                    const rawTarget = Number.parseInt(goal?.tallyTarget ?? goal?.tally_target ?? "", 10);
+                    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+                    const rawProgress = Number.parseInt(goal?.tallyProgress ?? goal?.tally_progress ?? "", 10);
+                    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0 ? rawProgress : 0;
+
+                    return {
+                      text: goalText,
+                      completed: index === FREE_SPACE_INDEX ? true : Boolean(goal?.completed),
+                      tallyTarget,
+                      tallyProgress: tallyTarget ? Math.min(tallyProgress, tallyTarget) : 0
+                    };
+                  });
+
+                  return (
+                    <article
+                      className="board-card member-board-card"
+                      key={board.id}
+                      style={{
+                        backgroundColor: boardColor,
+                        borderColor: boardColor,
+                        color: "#f4f9e9"
+                      }}
+                    >
+                      <div className="board-card-head">
+                        <h3 style={{ color: "#f4f9e9" }}>{board.title || "Untitled Board"}</h3>
+                        <span className="board-game-type" aria-label={`Game type: ${boardType}`}>{boardType}</span>
+                      </div>
+                      <div className="progress-row">
+                        <span>
+                          {completed} of {tracked} goals complete
+                        </span>
+                        <strong>{percent}%</strong>
+                      </div>
+                      <div className="progress-track" aria-hidden="true" style={{ backgroundColor: "rgba(244, 249, 233, 0.32)" }}>
+                        <div className="progress-fill" style={{ width: `${percent}%`, backgroundColor: "#f4f9e9" }}></div>
+                      </div>
+
+                      <div className="bingo-grid" aria-label="Assigned board preview">
+                        {displayGoals.map((goal, index) => (
+                          <div
+                            key={`${board.id}-tile-${index}`}
+                            className={`bingo-cell member-readonly-cell shape-${tileShape} ${goal.completed ? "is-done" : ""}`}
+                            style={{
+                              borderColor: boardColor,
+                              ...(goal.completed
+                                ? {
+                                  "--done-bg": completedTileBackground,
+                                  "--done-border": completedTileBorder
+                                }
+                                : {})
+                            }}
+                          >
+                            {goal.tallyTarget ? (
+                              <span className="bingo-tally">{goal.tallyProgress}/{goal.tallyTarget}</span>
+                            ) : null}
+                            <span>{goal.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            <button className="btn btn-primary" type="button" onClick={closeMemberBoardsPopup}>Close</button>
           </section>
         </div>
       )}
