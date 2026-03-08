@@ -972,7 +972,7 @@ p {
 }
 
 .board-delete-btn {
-  justify-self: end;
+  justify-self: start;
   background: rgba(244, 249, 233, 0.16);
   border-color: rgba(244, 249, 233, 0.72);
   color: #f4f9e9;

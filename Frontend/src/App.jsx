@@ -1329,14 +1329,6 @@ function DashboardPage({ user, setUser }) {
                       <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
                       <span className="board-game-type" aria-label={`Game type: ${gameTypeLabel}`}>{gameTypeLabel}</span>
                     </div>
-                    <button
-                      className="btn btn-outline board-delete-btn"
-                      type="button"
-                      onClick={() => requestDeleteBoard(board)}
-                      disabled={deletingBoardId === board.id}
-                    >
-                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
-                    </button>
                     <div className="progress-row">
                       <span>
                         {completedGoals} of {TRACKED_GOAL_COUNT} goals complete
@@ -1371,6 +1363,14 @@ function DashboardPage({ user, setUser }) {
                         </button>
                       ))}
                     </div>
+                    <button
+                      className="btn btn-outline board-delete-btn"
+                      type="button"
+                      onClick={() => requestDeleteBoard(board)}
+                      disabled={deletingBoardId === board.id}
+                    >
+                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
+                    </button>
                   </article>
                 );
               })}
