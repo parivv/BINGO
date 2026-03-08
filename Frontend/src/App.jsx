@@ -179,7 +179,9 @@ function LandingPage({ user }) {
 function AuthPage({ setUser, mode, user }) {
   const navigate = useNavigate();
   const brandTarget = user ? "/dashboard" : "/";
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -189,9 +191,17 @@ function AuthPage({ setUser, mode, user }) {
     event.preventDefault();
     setError("");
 
-    const trimmed = username.trim();
-    if (!trimmed || !password) {
-      setError("Username and password are required.");
+    const trimmedEmail = email.trim();
+    const trimmedUsername = username.trim();
+    const trimmedIdentifier = identifier.trim();
+
+    if (isSignup) {
+      if (!trimmedEmail || !trimmedUsername || !password) {
+        setError("Email, username, and password are required.");
+        return;
+      }
+    } else if (!trimmedIdentifier || !password) {
+      setError("Username or email and password are required.");
       return;
     }
 
@@ -206,7 +216,11 @@ function AuthPage({ setUser, mode, user }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: trimmed, name: trimmed, password })
+        body: JSON.stringify(
+          isSignup
+            ? { email: trimmedEmail, username: trimmedUsername, name: trimmedUsername, password }
+            : { identifier: trimmedIdentifier, password }
+        )
       });
 
       const data = await response.json();
@@ -260,17 +274,47 @@ function AuthPage({ setUser, mode, user }) {
           </p>
 
           <form className="auth-form" noValidate onSubmit={submitAuth}>
-            <label className="field-label" htmlFor="usernameInput">Email</label>
-            <input
-              id="usernameInput"
-              name="username"
-              className="field-input"
-              type="text"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
+            {isSignup ? (
+              <>
+                <label className="field-label" htmlFor="emailInput">Email</label>
+                <input
+                  id="emailInput"
+                  name="email"
+                  className="field-input"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+
+                <label className="field-label" htmlFor="usernameInput">Username</label>
+                <input
+                  id="usernameInput"
+                  name="username"
+                  className="field-input"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </>
+            ) : (
+              <>
+                <label className="field-label" htmlFor="identifierInput">Username or Email</label>
+                <input
+                  id="identifierInput"
+                  name="identifier"
+                  className="field-input"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                />
+              </>
+            )}
 
             <label className="field-label" htmlFor="passwordInput">Password</label>
             <input

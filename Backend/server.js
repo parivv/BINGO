@@ -201,21 +201,31 @@ app.post("/api/contact", (req, res) => {
 
 // ─── Email Sign Up ────────────────────────────────────────────
 app.post('/auth/signup', async (req, res) => {
-  const { email, name, password } = req.body;
-  if (!email || !name || !password)
+  const { email, username, name, password } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const usernameCandidate = typeof username === 'string' && username.trim() ? username : name;
+  const normalizedUsername = typeof usernameCandidate === 'string' ? usernameCandidate.trim() : '';
+
+  if (!normalizedEmail || !normalizedUsername || !password)
     return res.status(400).json({ error: 'All fields required' });
 
-  const { data: existingUser } = await supabase
-    .from('users').select('*').eq('email', email).single();
+  const { data: existingEmailUser } = await supabase
+    .from('users').select('*').eq('email', normalizedEmail).maybeSingle();
 
-  if (existingUser)
+  if (existingEmailUser)
     return res.status(400).json({ error: 'Email already in use' });
+
+  const { data: existingUsernameUser } = await supabase
+    .from('users').select('*').eq('name', normalizedUsername).maybeSingle();
+
+  if (existingUsernameUser)
+    return res.status(400).json({ error: 'Username already in use' });
 
   const password_hash = await bcrypt.hash(password, 10);
 
   const { data: newUser, error } = await supabase
     .from('users')
-    .insert({ email, name, password_hash, provider: 'email' })
+    .insert({ email: normalizedEmail, name: normalizedUsername, password_hash, provider: 'email' })
     .select().single();
 
   if (error) return res.status(500).json({ error: 'Signup failed' });
@@ -228,10 +238,23 @@ app.post('/auth/signup', async (req, res) => {
 
 // ─── Email Sign In ────────────────────────────────────────────
 app.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, email, username, password } = req.body;
+  const identifierCandidate =
+    typeof identifier === 'string' && identifier.trim()
+      ? identifier
+      : typeof email === 'string' && email.trim()
+        ? email
+        : username;
+  const normalizedIdentifier = typeof identifierCandidate === 'string' ? identifierCandidate.trim() : '';
+  if (!normalizedIdentifier || !password) {
+    return res.status(400).json({ error: 'Username or email and password are required' });
+  }
 
   const { data: user } = await supabase
-    .from('users').select('*').eq('email', email).single();
+    .from('users')
+    .select('*')
+    .or(`email.eq.${normalizedIdentifier.toLowerCase()},name.eq.${normalizedIdentifier}`)
+    .maybeSingle();
 
   if (!user)
     return res.status(400).json({ error: 'User not found' });
