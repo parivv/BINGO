@@ -546,6 +546,60 @@ app.post("/api/groups/join", requireAuth, async (req, res) => {
   return res.json({ group, joined: true });
 });
 
+app.delete("/api/groups/:groupId/leave", requireAuth, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: group, error: groupErr } = await supabase
+    .from("groups")
+    .select("id, owner_user_id")
+    .eq("id", groupId)
+    .maybeSingle();
+
+  if (groupErr) {
+    return res.status(500).json({ error: groupErr.message });
+  }
+
+  if (!group) {
+    return res.status(404).json({ error: "Group not found." });
+  }
+
+  if (group.owner_user_id === userId) {
+    return res.status(400).json({ error: "Group owners cannot leave. Delete the group instead." });
+  }
+
+  const { data: membership, error: membershipErr } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipErr) {
+    return res.status(500).json({ error: membershipErr.message });
+  }
+
+  if (!membership) {
+    return res.status(404).json({ error: "You are not a member of this group." });
+  }
+
+  const { error: leaveErr } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+
+  if (leaveErr) {
+    return res.status(500).json({ error: leaveErr.message });
+  }
+
+  return res.json({ success: true });
+});
+
 app.delete("/api/groups/:groupId", requireAuth, async (req, res) => {
   const { groupId } = req.params;
   const userId = req.user?.id;

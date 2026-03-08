@@ -495,6 +495,12 @@ async function joinGroupApi(code) {
   };
 }
 
+async function leaveGroupApi(groupId) {
+  await apiRequest(`/api/groups/${groupId}/leave`, {
+    method: "DELETE"
+  });
+}
+
 async function fetchGroupLeaderboardApi(groupId) {
   const payload = await apiRequest(`/api/groups/${groupId}/leaderboard`, { method: "GET" });
   return Array.isArray(payload.entries) ? payload.entries : [];
@@ -944,6 +950,8 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const [memberBoardsPopup, setMemberBoardsPopup] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [isUsernamePopupOpen, setIsUsernamePopupOpen] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
   const [draggedBoardId, setDraggedBoardId] = useState(null);
   const [hasLoadedBoards, setHasLoadedBoards] = useState(false);
   const [editingBoard, setEditingBoard] = useState(null);
@@ -1347,6 +1355,26 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
     }
   }
 
+  async function leaveGroup(groupId) {
+    if (!groupId) {
+      return;
+    }
+
+    try {
+      await leaveGroupApi(groupId);
+      setGroups((previous) => previous.filter((group) => group.id !== groupId));
+      setGroupLeaderboards((previous) => previous.filter((group) => group.id !== groupId));
+      setAssignmentDraftByGroup((previous) => {
+        const next = { ...previous };
+        delete next[groupId];
+        return next;
+      });
+      setGroupNotice("You left the group.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not leave group.");
+    }
+  }
+
   function closeMemberBoardsPopup() {
     setMemberBoardsPopup(null);
   }
@@ -1613,17 +1641,27 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
     setDraggedBoardId(null);
   }
 
-  async function editUsername() {
+  function editUsername() {
     if (isUpdatingUsername) {
       return;
     }
 
-    const inputName = window.prompt("Enter your new username:", user.name || "");
-    if (inputName === null) {
+    setUsernameDraft(user.name || "");
+    setIsUsernamePopupOpen(true);
+  }
+
+  function closeUsernamePopup() {
+    if (isUpdatingUsername) {
       return;
     }
 
-    const trimmedName = inputName.trim();
+    setIsUsernamePopupOpen(false);
+  }
+
+  async function saveUsername(event) {
+    event.preventDefault();
+
+    const trimmedName = usernameDraft.trim();
     if (!trimmedName) {
       setGroupNotice("Username cannot be empty.");
       return;
@@ -1650,6 +1688,7 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
           )
         }))
       );
+      setIsUsernamePopupOpen(false);
       setGroupNotice("Username updated.");
     } catch (error) {
       setGroupNotice(error.message || "Could not update username.");
@@ -2248,6 +2287,16 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
                         {deletingGroupId === group.id ? "Deleting..." : "Delete Group"}
                       </button>
                     )}
+
+                    {group.ownerId !== user.id && (
+                      <button
+                        className="btn btn-outline group-delete-btn"
+                        type="button"
+                        onClick={() => leaveGroup(group.id)}
+                      >
+                        Leave Group
+                      </button>
+                    )}
                         </>
                       );
                     })()}
@@ -2258,6 +2307,41 @@ function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
           </section>
         )}
       </main>
+
+        {isUsernamePopupOpen && (
+          <div className="win-popup-backdrop" role="presentation" onClick={closeUsernamePopup}>
+            <section
+              className="win-popup"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="editUsernameTitle"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 id="editUsernameTitle">Edit Username</h2>
+              <form className="username-edit-form" onSubmit={saveUsername}>
+                <label className="field-label" htmlFor="editUsernameInput">New username</label>
+                <input
+                  id="editUsernameInput"
+                  className="field-input"
+                  type="text"
+                  value={usernameDraft}
+                  onChange={(event) => setUsernameDraft(event.target.value)}
+                  disabled={isUpdatingUsername}
+                  required
+                  autoFocus
+                />
+                <div className="confirm-popup-actions">
+                  <button className="btn btn-ghost" type="button" onClick={closeUsernamePopup} disabled={isUpdatingUsername}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" type="submit" disabled={isUpdatingUsername}>
+                    {isUpdatingUsername ? "Saving..." : "Save Username"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
 
       {editingBoard && (
         <div className="win-popup-backdrop" role="presentation" onClick={closeEditBoard}>
