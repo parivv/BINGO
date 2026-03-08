@@ -1275,7 +1275,20 @@ p {
   }
 
   .landing-hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+  }
+
+  .landing-hero-copy {
+    grid-column: 1;
+  }
+
+  .landing-hero-volcano {
+    grid-column: 2;
+    justify-self: end;
+    margin-inline: 0;
+    margin-top: -1.05rem;
+    max-width: 210px;
   }
 
   .feature-grid {
@@ -1340,6 +1353,16 @@ p {
 @media (max-width: 640px) {
   .landing-main {
     gap: 1.1rem;
+  }
+
+  .landing-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-hero-volcano {
+    justify-self: center;
+    margin-inline: auto;
+    max-width: 220px;
   }
 
   .landing-hero h1 {
