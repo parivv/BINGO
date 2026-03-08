@@ -44,17 +44,55 @@ const TILE_SHAPE_OPTIONS = [
   { id: "circle", label: "Circle" }
 ];
 
+function hexToRgb(hexColor) {
+  if (typeof hexColor !== "string") {
+    return null;
+  }
+
+  const cleaned = hexColor.trim().replace(/^#/, "");
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(cleaned)) {
+    return null;
+  }
+
+  const normalized = cleaned.length === 3
+    ? cleaned.split("").map((character) => `${character}${character}`).join("")
+    : cleaned;
+
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16)
+  };
+}
+
+function lightenHex(hexColor, ratio = 0.3) {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) {
+    return hexColor;
+  }
+
+  const amount = Math.min(1, Math.max(0, ratio));
+  const tintChannel = (channel) => Math.round(channel + (255 - channel) * amount);
+  return `rgb(${tintChannel(rgb.r)}, ${tintChannel(rgb.g)}, ${tintChannel(rgb.b)})`;
+}
+
 function createDraftGoals() {
   return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) =>
     index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : ""
   );
 }
 
+function createDraftTallies() {
+  return Array.from({ length: FIXED_GOAL_COUNT }, () => "");
+}
+
 function createDefaultGoal(index, completed = false) {
   return {
     id: crypto.randomUUID(),
     text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`,
-    completed: index === FREE_SPACE_INDEX ? true : completed
+    completed: index === FREE_SPACE_INDEX ? true : completed,
+    tallyTarget: null,
+    tallyProgress: 0
   };
 }
 
@@ -76,10 +114,26 @@ function normalizeBoard(rawBoard) {
       ? FREE_SPACE_TEXT
       : (typeof rawGoal.text === "string" && rawGoal.text.trim() ? rawGoal.text.trim() : `Goal ${index + 1}`);
 
+    const rawTarget = Number.parseInt(rawGoal.tallyTarget ?? rawGoal.tally_target ?? "", 10);
+    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+
+    const rawProgress = Number.parseInt(rawGoal.tallyProgress ?? rawGoal.tally_progress ?? "", 10);
+    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0
+      ? (tallyTarget ? Math.min(rawProgress, tallyTarget) : rawProgress)
+      : 0;
+
+    const completed = index === FREE_SPACE_INDEX
+      ? true
+      : tallyTarget
+        ? tallyProgress >= tallyTarget
+        : Boolean(rawGoal.completed);
+
     return {
       id: rawGoal.id || crypto.randomUUID(),
       text,
-      completed: index === FREE_SPACE_INDEX ? true : Boolean(rawGoal.completed)
+      completed,
+      tallyTarget,
+      tallyProgress: tallyTarget ? tallyProgress : 0
     };
   });
 
@@ -641,6 +695,7 @@ function DashboardPage({ user, setUser }) {
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
   const [draftGameType, setDraftGameType] = useState("five-in-a-row");
   const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
+  const [draftTallies, setDraftTallies] = useState(() => createDraftTallies());
   const [groups, setGroups] = useState([]);
   const [groupLeaderboards, setGroupLeaderboards] = useState([]);
   const [newGroupName, setNewGroupName] = useState("");
@@ -761,8 +816,22 @@ function DashboardPage({ user, setUser }) {
     setDraftTitle("My 2026 Goals");
     setDraftGameType("five-in-a-row");
     setDraftGoals(createDraftGoals());
+    setDraftTallies(createDraftTallies());
     setDraftBoardColor("#c10b3c");
     setDraftTileShape("rounded");
+  }
+
+  function updateDraftTally(index, value) {
+    setDraftTallies((previous) => {
+      const next = [...previous];
+      if (index === FREE_SPACE_INDEX) {
+        next[index] = "";
+        return next;
+      }
+
+      next[index] = value.replace(/[^0-9]/g, "").slice(0, 2);
+      return next;
+    });
   }
 
   function goToCreateStep(nextStep) {
@@ -788,7 +857,16 @@ function DashboardPage({ user, setUser }) {
     const goals = draftGoals.map((goalText, index) => ({
       id: crypto.randomUUID(),
       text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : (goalText.trim() || `Goal ${index + 1}`),
-      completed: index === FREE_SPACE_INDEX
+      completed: index === FREE_SPACE_INDEX,
+      tallyTarget: (() => {
+        if (index === FREE_SPACE_INDEX) {
+          return null;
+        }
+
+        const parsed = Number.parseInt(draftTallies[index] || "", 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      })(),
+      tallyProgress: 0
     }));
 
     try {
@@ -898,7 +976,16 @@ function DashboardPage({ user, setUser }) {
     const goals = Array.isArray(currentBoard.goals)
       ? currentBoard.goals.map((goal) =>
         goal.id === goalId && goal.text !== FREE_SPACE_TEXT
-          ? { ...goal, completed: !goal.completed }
+          ? goal.tallyTarget
+            ? (() => {
+              const nextProgress = goal.tallyProgress >= goal.tallyTarget ? 0 : goal.tallyProgress + 1;
+              return {
+                ...goal,
+                tallyProgress: nextProgress,
+                completed: nextProgress >= goal.tallyTarget
+              };
+            })()
+            : { ...goal, completed: !goal.completed }
           : goal
       )
       : [];
@@ -1014,6 +1101,8 @@ function DashboardPage({ user, setUser }) {
                 const completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
                 const boardColor = board.boardColor || "#c10b3c";
                 const tileShape = board.tileShape || "rounded";
+                const completedTileBackground = lightenHex(boardColor, 0.38);
+                const completedTileBorder = lightenHex(boardColor, 0.24);
                 return (
                   <article
                     className="board-card"
@@ -1041,9 +1130,20 @@ function DashboardPage({ user, setUser }) {
                           key={goal.id}
                           className={`bingo-cell shape-${tileShape} ${goal.completed ? "is-done" : ""}`}
                           type="button"
-                          style={{ borderColor: boardColor }}
+                          style={{
+                            borderColor: boardColor,
+                            ...(goal.completed
+                              ? {
+                                "--done-bg": completedTileBackground,
+                                "--done-border": completedTileBorder
+                              }
+                              : {})
+                          }}
                           onClick={() => toggleGoal(board.id, goal.id)}
                         >
+                          {goal.tallyTarget ? (
+                            <span className="bingo-tally">{goal.tallyProgress}/{goal.tallyTarget}</span>
+                          ) : null}
                           <span>{goal.text}</span>
                         </button>
                       ))}
@@ -1130,9 +1230,21 @@ function DashboardPage({ user, setUser }) {
                   <div className="create-goal-grid" aria-label="Create board goals">
                     {draftGoals.map((goal, index) => (
                       <div className={`goal-input-cell ${index === FREE_SPACE_INDEX ? "is-free-space" : ""}`} key={`draft-${index}`}>
-                        <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
-                          {index + 1}
-                        </label>
+                        <div className="goal-input-toprow">
+                          <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
+                            {index + 1}
+                          </label>
+                          <input
+                            id={`goal-tally-${index}`}
+                            className="goal-tally-input"
+                            type="text"
+                            inputMode="numeric"
+                            value={draftTallies[index]}
+                            onChange={(event) => updateDraftTally(index, event.target.value)}
+                            readOnly={index === FREE_SPACE_INDEX}
+                            aria-label={index === FREE_SPACE_INDEX ? "Free space" : `Optional tally target for goal ${index + 1}`}
+                          />
+                        </div>
                         <input
                           id={`goal-input-${index}`}
                           className="goal-input"

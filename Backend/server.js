@@ -562,7 +562,9 @@ function normalizeGoals(rawGoals) {
       return {
         id: randomUUID(),
         text: defaultText,
-        completed: index === FREE_SPACE_INDEX
+        completed: index === FREE_SPACE_INDEX,
+        tallyTarget: null,
+        tallyProgress: 0
       };
     }
 
@@ -573,10 +575,24 @@ function normalizeGoals(rawGoals) {
           ? rawGoal.text.trim()
           : defaultText;
 
+    const rawTarget = Number.parseInt(rawGoal.tallyTarget ?? rawGoal.tally_target ?? "", 10);
+    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+
+    const rawProgress = Number.parseInt(rawGoal.tallyProgress ?? rawGoal.tally_progress ?? "", 10);
+    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0
+      ? (tallyTarget ? Math.min(rawProgress, tallyTarget) : rawProgress)
+      : 0;
+
     return {
       id: rawGoal.id || randomUUID(),
       text,
-      completed: index === FREE_SPACE_INDEX ? true : Boolean(rawGoal.completed)
+      completed: index === FREE_SPACE_INDEX
+        ? true
+        : tallyTarget
+          ? tallyProgress >= tallyTarget
+          : Boolean(rawGoal.completed),
+      tallyTarget,
+      tallyProgress: tallyTarget ? tallyProgress : 0
     };
   });
 }

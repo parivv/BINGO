@@ -787,6 +787,12 @@ p {
   padding: 0.35rem;
 }
 
+.goal-input-toprow {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
 .goal-input-cell.is-free-space {
   background: rgba(135, 8, 42, 0.14);
   border-color: rgba(135, 8, 42, 0.5);
@@ -796,6 +802,21 @@ p {
   color: var(--accent);
   font-size: 0.68rem;
   font-weight: 800;
+}
+
+.goal-tally-input {
+  background: rgba(244, 249, 233, 0.95);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-align: center;
+  width: 2.2rem;
+}
+
+.goal-tally-input[readonly] {
+  opacity: 0.55;
 }
 
 .goal-input {
@@ -827,7 +848,7 @@ p {
 .board-grid {
   display: grid;
   gap: 0.95rem;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .board-card {
@@ -872,8 +893,18 @@ p {
 }
 
 .bingo-cell.is-done {
-  background: #f7c3d1;
-  border-color: #ef98b1;
+  background: var(--done-bg, #f7c3d1);
+  border-color: var(--done-border, #ef98b1);
+}
+
+.bingo-tally {
+  align-self: flex-end;
+  background: rgba(52, 32, 32, 0.12);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.16rem 0.33rem;
 }
 
 .bingo-cell.shape-rounded {
