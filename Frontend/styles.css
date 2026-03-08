@@ -592,6 +592,11 @@ p {
   column-gap: 0.7rem;
   display: flex;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+.profile-name-row .btn {
+  margin-left: auto;
 }
 
 .profile-name-row h2 {
