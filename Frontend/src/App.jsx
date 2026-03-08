@@ -6,7 +6,7 @@ const STORAGE_KEYS = {
   boards: "bingo-battles.boards"
 };
 
-const BACKEND_ORIGIN = "http://localhost:5000";
+const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || "http://localhost:5000";
 
 function normalizeUser(rawUser) {
   if (!rawUser || typeof rawUser !== "object") {
@@ -86,15 +86,26 @@ function AmbientBackground() {
   );
 }
 
+function AppFooter() {
+  return (
+    <footer className="site-footer">
+      <p>
+        dorm floor productions
+        <span className="tm-symbol">&trade;</span>
+      </p>
+    </footer>
+  );
+}
+
 function LandingPage() {
   const navigate = useNavigate();
 
   return (
     <>
       <AmbientBackground />
-      <header className="topbar landing-topbar">
+      <header className="topbar app-topbar">
         <Link className="brand" to="/">Bingo Battles</Link>
-        <nav className="auth-links" aria-label="Authentication links">
+        <nav className="primary-nav auth-links" aria-label="Authentication links">
           <button className="btn btn-outline" type="button" onClick={() => navigate("/login")}>
             Log In
           </button>
@@ -137,6 +148,8 @@ function LandingPage() {
           </div>
         </section>
       </main>
+
+      <AppFooter />
     </>
   );
 }
@@ -197,8 +210,20 @@ function AuthPage({ setUser, mode }) {
   return (
     <>
       <AmbientBackground />
-      <header className="topbar landing-topbar">
+      <header className="topbar app-topbar">
         <Link className="brand" to="/">Bingo Battles</Link>
+        <nav className="primary-nav auth-links" aria-label="Authentication navigation">
+          <button className="btn btn-outline" type="button" onClick={() => navigate("/")}>
+            About
+          </button>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => navigate(isSignup ? "/login" : "/signup")}
+          >
+            {isSignup ? "Log In" : "Sign Up"}
+          </button>
+        </nav>
       </header>
 
       <main className="auth-main">
@@ -274,6 +299,8 @@ function AuthPage({ setUser, mode }) {
           </p>
         </section>
       </main>
+
+      <AppFooter />
     </>
   );
 }
@@ -507,6 +534,8 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
       </main>
+
+      <AppFooter />
     </>
   );
 }
@@ -582,6 +611,7 @@ function DashboardGate({ user, setUser }) {
             <h1>Loading session...</h1>
           </section>
         </main>
+        <AppFooter />
       </>
     );
   }
