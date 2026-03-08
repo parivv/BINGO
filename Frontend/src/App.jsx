@@ -5,6 +5,7 @@ import gridIcon from "../Grid_Icon.png";
 import trophyIcon from "../Trophy_Icon.png";
 import friendsIcon from "../Friends_Icon.png";
 import volcaneSVG from "../Volcano_SVG.svg";
+import footerVolcanoGif from "../Final Volcano.gif";
 
 const STORAGE_KEYS = {
   user: "bingo-battles.user"
@@ -299,9 +300,12 @@ function AmbientBackground() {
 function AppFooter() {
   return (
     <footer className="site-footer">
-      <p>
-        dorm floor productions
-        <span className="tm-symbol">&trade;</span>
+      <p className="footer-copy">
+        <span>
+          dorm floor productions
+          <span className="tm-symbol">&trade;</span>
+        </span>
+        <img className="footer-volcano-gif" src={footerVolcanoGif} alt="" aria-hidden="true" />
       </p>
     </footer>
   );
