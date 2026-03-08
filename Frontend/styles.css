@@ -559,6 +559,11 @@ p {
   padding: 1.2rem;
 }
 
+.view-panel:has(.create-wizard) {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
 .panel-head {
   display: grid;
   gap: 0.35rem;
