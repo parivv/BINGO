@@ -399,6 +399,10 @@ p {
   padding: 1.1rem;
 }
 
+.center-action-btn {
+  justify-self: center;
+}
+
 .board-grid {
   display: grid;
   gap: 0.95rem;
@@ -483,7 +487,7 @@ p {
 .site-footer p {
   color: rgba(244, 249, 233, 0.96);
   font-family: "CF Band of Brothers", "Volcanic Dungeon", Impact, sans-serif;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   letter-spacing: 0.04em;
   margin: 0;
   padding-top: 0.75rem;

@@ -466,7 +466,7 @@ function DashboardPage({ user, setUser }) {
               <div className="empty-state">
                 <h2>No boards yet</h2>
                 <p>Create your first Bingo board to start tracking progress.</p>
-                <button className="btn btn-primary" type="button" onClick={createBoard}>
+                <button className="btn btn-primary center-action-btn" type="button" onClick={createBoard}>
                   Create a Board
                 </button>
               </div>
@@ -501,13 +501,13 @@ function DashboardPage({ user, setUser }) {
           <section className="view-panel" aria-labelledby="createTitle">
             <div className="panel-head">
               <h1 id="createTitle">Create a New Card</h1>
-              <p>Build a fresh BINGO board and start tracking your goals today.</p>
+              <p>Build a fresh Bingo board and start tracking your goals today.</p>
             </div>
 
             <div className="empty-state">
               <h2>Ready for a new challenge?</h2>
               <p>Choose a board name and number of goals, then we will add it to your dashboard.</p>
-              <button className="btn btn-primary" type="button" onClick={createBoard}>
+              <button className="btn btn-primary center-action-btn" type="button" onClick={createBoard}>
                 Create a Board
               </button>
             </div>
