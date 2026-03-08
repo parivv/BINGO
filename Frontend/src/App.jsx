@@ -23,6 +23,7 @@ const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BAS
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
+const TRACKED_GOAL_COUNT = FIXED_GOAL_COUNT - 1;
 const CREATE_STEPS = ["Board Name", "Game Type", "Add Goals", "Customize"];
 const GAME_TYPE_OPTIONS = [
   {
@@ -53,7 +54,7 @@ function createDefaultGoal(index, completed = false) {
   return {
     id: crypto.randomUUID(),
     text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`,
-    completed
+    completed: index === FREE_SPACE_INDEX ? true : completed
   };
 }
 
@@ -74,14 +75,15 @@ function normalizeBoard(rawBoard) {
     const text = index === FREE_SPACE_INDEX
       ? FREE_SPACE_TEXT
       : (typeof rawGoal.text === "string" && rawGoal.text.trim() ? rawGoal.text.trim() : `Goal ${index + 1}`);
+
     return {
       id: rawGoal.id || crypto.randomUUID(),
       text,
-      completed: Boolean(rawGoal.completed)
+      completed: index === FREE_SPACE_INDEX ? true : Boolean(rawGoal.completed)
     };
   });
 
-  const completed = normalizedGoals.filter((goal) => goal.completed).length;
+  const completed = normalizedGoals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length;
 
   return {
     id: rawBoard.id || crypto.randomUUID(),
@@ -89,9 +91,9 @@ function normalizeBoard(rawBoard) {
     total: FIXED_GOAL_COUNT,
     completed,
     goals: normalizedGoals,
-    gameType: rawBoard.gameType || "five-in-a-row",
-    boardColor: rawBoard.boardColor || "#c10b3c",
-    tileShape: rawBoard.tileShape || "rounded"
+    gameType: rawBoard.gameType || rawBoard.game_type || "five-in-a-row",
+    boardColor: rawBoard.boardColor || rawBoard.board_color || "#c10b3c",
+    tileShape: rawBoard.tileShape || rawBoard.tile_shape || rawBoard.shape || "rounded"
   };
 }
 
@@ -140,7 +142,12 @@ function calculateProgressFromBoards(boards) {
   }
 
   return Math.round(
-    boards.reduce((sum, board) => sum + Math.round((board.completed / board.total) * 100), 0) / boards.length
+    boards.reduce((sum, board) => {
+      const completed = Array.isArray(board.goals)
+        ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+        : board.completed;
+      return sum + Math.round((completed / TRACKED_GOAL_COUNT) * 100);
+    }, 0) / boards.length
   );
 }
 
@@ -215,10 +222,10 @@ async function fetchBoardsApi() {
   return boards.map(normalizeBoard).filter(Boolean);
 }
 
-async function createBoardApi(title, goals) {
+async function createBoardApi(boardDraft) {
   const payload = await apiRequest("/api/boards", {
     method: "POST",
-    body: JSON.stringify({ title, goals })
+    body: JSON.stringify(boardDraft)
   });
 
   return normalizeBoard(payload.board);
@@ -229,7 +236,10 @@ async function updateBoardApi(board) {
     method: "PUT",
     body: JSON.stringify({
       title: board.title,
-      goals: board.goals
+      goals: board.goals,
+      gameType: board.gameType,
+      boardColor: board.boardColor,
+      tileShape: board.tileShape
     })
   });
 
@@ -778,11 +788,17 @@ function DashboardPage({ user, setUser }) {
     const goals = draftGoals.map((goalText, index) => ({
       id: crypto.randomUUID(),
       text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : (goalText.trim() || `Goal ${index + 1}`),
-      completed: false
+      completed: index === FREE_SPACE_INDEX
     }));
 
     try {
-      const created = await createBoardApi(title.trim(), goals);
+      const created = await createBoardApi({
+        title: title.trim(),
+        goals,
+        gameType: draftGameType,
+        boardColor: draftBoardColor,
+        tileShape: draftTileShape
+      });
       if (created) {
         setBoards((previous) => [
           {
@@ -872,9 +888,16 @@ function DashboardPage({ user, setUser }) {
       return;
     }
 
+    const targetGoal = Array.isArray(currentBoard.goals)
+      ? currentBoard.goals.find((goal) => goal.id === goalId)
+      : null;
+    if (targetGoal?.text === FREE_SPACE_TEXT) {
+      return;
+    }
+
     const goals = Array.isArray(currentBoard.goals)
       ? currentBoard.goals.map((goal) =>
-        goal.id === goalId
+        goal.id === goalId && goal.text !== FREE_SPACE_TEXT
           ? { ...goal, completed: !goal.completed }
           : goal
       )
@@ -883,7 +906,7 @@ function DashboardPage({ user, setUser }) {
     const optimisticBoard = {
       ...currentBoard,
       goals,
-      completed: goals.filter((goal) => goal.completed).length
+      completed: goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
     };
 
     setBoards((previous) => previous.map((board) => (board.id === boardId ? optimisticBoard : board)));
@@ -985,29 +1008,42 @@ function DashboardPage({ user, setUser }) {
 
             <div className="board-grid" aria-live="polite">
               {boards.map((board) => {
-                const completionPercent = Math.round((board.completed / board.total) * 100);
+                const completedGoals = Array.isArray(board.goals)
+                  ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+                  : board.completed;
+                const completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                const boardColor = board.boardColor || "#c10b3c";
+                const tileShape = board.tileShape || "rounded";
                 return (
-                  <article className="board-card" key={board.id}>
-                    <h3>{board.title}</h3>
+                  <article
+                    className="board-card"
+                    key={board.id}
+                    style={{
+                      backgroundColor: boardColor,
+                      borderColor: boardColor,
+                      color: "#f4f9e9"
+                    }}
+                  >
+                    <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
                     <div className="progress-row">
                       <span>
-                        {board.completed} of {board.total} goals complete
+                        {completedGoals} of {TRACKED_GOAL_COUNT} goals complete
                       </span>
                       <strong>{completionPercent}%</strong>
                     </div>
-                    <div className="progress-track" aria-hidden="true">
-                      <div className="progress-fill" style={{ width: `${completionPercent}%` }}></div>
+                    <div className="progress-track" aria-hidden="true" style={{ backgroundColor: "rgba(244, 249, 233, 0.32)" }}>
+                      <div className="progress-fill" style={{ width: `${completionPercent}%`, backgroundColor: "#f4f9e9" }}></div>
                     </div>
 
                     <div className="bingo-grid" aria-label={`${board.title} goals`}>
                       {board.goals.map((goal, index) => (
                         <button
                           key={goal.id}
-                          className={`bingo-cell ${goal.completed ? "is-done" : ""}`}
+                          className={`bingo-cell shape-${tileShape} ${goal.completed ? "is-done" : ""}`}
                           type="button"
+                          style={{ borderColor: boardColor }}
                           onClick={() => toggleGoal(board.id, goal.id)}
                         >
-                          <span className="bingo-cell-index">{index + 1}</span>
                           <span>{goal.text}</span>
                         </button>
                       ))}

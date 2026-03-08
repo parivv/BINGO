@@ -872,8 +872,20 @@ p {
 }
 
 .bingo-cell.is-done {
-  background: rgba(135, 8, 42, 0.14);
-  border-color: rgba(135, 8, 42, 0.5);
+  background: #f7c3d1;
+  border-color: #ef98b1;
+}
+
+.bingo-cell.shape-rounded {
+  border-radius: 10px;
+}
+
+.bingo-cell.shape-square {
+  border-radius: 0;
+}
+
+.bingo-cell.shape-circle {
+  border-radius: 999px;
 }
 
 .bingo-cell-index {
@@ -1112,6 +1124,10 @@ p {
 }
 
 @media (max-width: 900px) {
+  .board-grid {
+    grid-template-columns: 1fr;
+  }
+
   .landing-hero {
     grid-template-columns: 1fr;
   }
