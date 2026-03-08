@@ -138,53 +138,41 @@ function LandingPage({ user }) {
       </header>
 
       <main className="landing-main">
-        <section className="landing-section hero" aria-labelledby="hero-title">
-          <p className="eyebrow">Turn intent into action</p>
-          <h1 id="hero-title">Transform your goals into an explosive challenge</h1>
-          <p className="hero-copy">
-            Bingo Battles helps you map your personal goals onto a board, track real progress, and stay motivated with
-            friendly competition. Complete squares, raise your percentage, and race your friends on the leaderboard.
-          </p>
-        </section>
-
-        <section className="landing-section" aria-labelledby="features-title">
-          <h2 id="features-title">Features</h2>
-          <div className="feature-grid">
-            <article className="feature-card">
-              <h3>Custom Boards</h3>
-              <p>Build a board around your real goals with flexible square counts and categories.</p>
-            </article>
-            <article className="feature-card">
-              <h3>Progress Tracking</h3>
-              <p>See completion percentages update as you mark goals complete.</p>
-            </article>
-            <article className="feature-card">
-              <h3>Leaderboard</h3>
-              <p>Compare momentum with friends and keep each other motivated.</p>
-            </article>
+        <section className="landing-hero" aria-labelledby="hero-title">
+          <div className="landing-hero-copy">
+            <h1 id="hero-title">Turn Your Goals Into An Explosive Challenge</h1>
+            <p className="hero-copy">
+              Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt.
+            </p>
           </div>
         </section>
 
-        <section className="landing-section" aria-labelledby="how-title">
-          <h2 id="how-title">How It Works</h2>
-          <ol className="how-list">
-            <li>Create a custom Bingo board for your personal goals.</li>
-            <li>Track progress, mark completed goals, and watch your completion percentage rise.</li>
-            <li>Join a group and compare progress on the leaderboard.</li>
-          </ol>
+        <section className="feature-grid landing-feature-grid" aria-label="Key features">
+          <article className="feature-card">
+            <span className="feature-chip">IG</span>
+            <h3>Custom BINGO Boards</h3>
+            <p>Create personalized Bingo boards with your unique goals and challenges.</p>
+          </article>
+
+          <article className="feature-card">
+            <span className="feature-chip">LB</span>
+            <h3>Competitive Leaderboard</h3>
+            <p>See how you stack up against friends and climb to the top.</p>
+          </article>
+
+          <article className="feature-card">
+            <span className="feature-chip">FR</span>
+            <h3>Battle With Friends</h3>
+            <p>Join groups, share your boards, and motivate each other to reach goals together.</p>
+          </article>
         </section>
 
-        <section className="landing-section join-now" aria-labelledby="join-title">
-          <h2 id="join-title">Join Now</h2>
-          <p>Start your first board and begin tracking your goals today.</p>
-          <div className="hero-actions">
-            <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
-              Create Your First Board
-            </button>
-            <button className="btn btn-ghost btn-lg" type="button" onClick={() => navigate("/login")}>
-              I Already Have an Account
-            </button>
-          </div>
+        <section className="landing-cta" aria-labelledby="cta-title">
+          <h2 id="cta-title">Ready to Erupt?</h2>
+          <p>Join thousands of goal-getters turning dreams into achievements.</p>
+          <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
+            Start Your Battle
+          </button>
         </section>
       </main>
 
