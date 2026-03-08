@@ -6,6 +6,10 @@ import trophyIcon from "../Trophy_Icon.png";
 import friendsIcon from "../Friends_Icon.png";
 import volcaneSVG from "../Volcano_SVG.svg";
 import footerVolcanoGif from "../Final Volcano.gif";
+import pariHeadshot from "../Pari_Headshot.jpg";
+import joyceHeadshot from "../Joyce_Headshot.jpg";
+import hadiyaHeadshot from "../Hadiya_Headshot.jpg";
+import colinHeadshot from "../Colin_Headshot.jpg";
 
 const STORAGE_KEYS = {
   user: "bingo-battles.user"
@@ -365,6 +369,35 @@ function LandingPage({ user }) {
             <h3>Battle With Friends</h3>
             <p>Join groups, share your boards, and motivate each other to reach goals together.</p>
           </article>
+        </section>
+
+        <section className="landing-team" aria-label="Our Team">
+          <h2>Our Team</h2>
+          <div className="team-grid">
+            <a href="https://www.linkedin.com/in/pari-vyas/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={pariHeadshot} alt="Pari Vyas" className="team-headshot" />
+              <h3>Pari Vyas</h3>
+              <span className="team-role-pill">Backend Developer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/joyce-maniquis-aa79b531b/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={joyceHeadshot} alt="Joyce Maniquis" className="team-headshot" />
+              <h3>Joyce Maniquis</h3>
+              <span className="team-role-pill">Frontend Developer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/hadiya-stewart-aab467352/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={hadiyaHeadshot} alt="Hadiya Stewart" className="team-headshot" />
+              <h3>Hadiya Stewart</h3>
+              <span className="team-role-pill">UI Designer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/colin-mendoza/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={colinHeadshot} alt="Colin Mendoza" className="team-headshot" />
+              <h3>Colin Mendoza</h3>
+              <span className="team-role-pill">UX Designer</span>
+            </a>
+          </div>
         </section>
 
         <section className="landing-cta" aria-labelledby="cta-title">

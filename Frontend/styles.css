@@ -402,6 +402,68 @@ p {
   background: #5c0017;
 }
 
+.landing-team {
+  display: grid;
+  gap: 2rem;
+  text-align: center;
+}
+
+.landing-team h2 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  margin-bottom: 0.5rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.team-card {
+  background: rgba(244, 249, 233, 0.72);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(52, 32, 32, 0.25);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  cursor: pointer;
+}
+
+.team-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 16px 40px rgba(52, 32, 32, 0.35);
+}
+
+.team-headshot {
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
+  object-fit: cover;
+  margin: 0;
+  display: block;
+}
+
+.team-card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.team-role-pill {
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: #342020;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.72rem;
+}
+
 .usage-panel {
   animation: rise 800ms ease;
   padding: 1.35rem 1.2rem;
@@ -1010,6 +1072,10 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .team-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .topbar {
     flex-wrap: wrap;
     gap: 0.65rem;
@@ -1039,6 +1105,10 @@ p {
 
   .landing-hero h1 {
     font-size: clamp(1.9rem, 11vw, 3rem);
+  }
+
+  .team-grid {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-topbar .primary-nav {
