@@ -704,16 +704,18 @@ function AuthPage({ setUser, mode, user }) {
             Continue with Google
           </button>
 
-          <a
-            className="text-link"
-            href="#"
-            onClick={(event) => {
-              event.preventDefault();
-              window.alert("Password reset is coming soon.");
-            }}
-          >
-            Forgot password?
-          </a>
+          {!isSignup && (
+            <a
+              className="text-link"
+              href="#"
+              onClick={(event) => {
+                event.preventDefault();
+                window.alert("Password reset is coming soon.");
+              }}
+            >
+              Forgot password?
+            </a>
+          )}
 
           <p className="auth-switch">
             {isSignup ? "Already have an account? " : "Need an account? "}
