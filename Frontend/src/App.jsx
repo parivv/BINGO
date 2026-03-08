@@ -11,6 +11,58 @@ const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:5000";
 const API_ORIGIN = OAUTH_BACKEND_ORIGIN;
 const APP_BASE = import.meta.env.BASE_URL || "/";
 const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BASE;
+const FIXED_GOAL_COUNT = 25;
+const FREE_SPACE_INDEX = 12;
+const FREE_SPACE_TEXT = "FREE SPACE";
+
+function createDraftGoals() {
+  return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) =>
+    index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : ""
+  );
+}
+
+function createDefaultGoal(index, completed = false) {
+  return {
+    id: crypto.randomUUID(),
+    text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`,
+    completed
+  };
+}
+
+function normalizeBoard(rawBoard) {
+  if (!rawBoard || typeof rawBoard !== "object") {
+    return null;
+  }
+
+  const legacyCompleted = Number.isFinite(rawBoard.completed) ? Math.max(0, rawBoard.completed) : 0;
+  const rawGoals = Array.isArray(rawBoard.goals) ? rawBoard.goals : [];
+
+  const normalizedGoals = Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => {
+    const rawGoal = rawGoals[index];
+    if (!rawGoal || typeof rawGoal !== "object") {
+      return createDefaultGoal(index, index < legacyCompleted);
+    }
+
+    const text = index === FREE_SPACE_INDEX
+      ? FREE_SPACE_TEXT
+      : (typeof rawGoal.text === "string" && rawGoal.text.trim() ? rawGoal.text.trim() : `Goal ${index + 1}`);
+    return {
+      id: rawGoal.id || crypto.randomUUID(),
+      text,
+      completed: Boolean(rawGoal.completed)
+    };
+  });
+
+  const completed = normalizedGoals.filter((goal) => goal.completed).length;
+
+  return {
+    id: rawBoard.id || crypto.randomUUID(),
+    title: typeof rawBoard.title === "string" && rawBoard.title.trim() ? rawBoard.title.trim() : "Untitled Board",
+    total: FIXED_GOAL_COUNT,
+    completed,
+    goals: normalizedGoals
+  };
+}
 
 function toUsername(value) {
   if (typeof value !== "string") {
@@ -86,7 +138,11 @@ function readBoards(user) {
 
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map(normalizeBoard).filter(Boolean);
   } catch (_error) {
     return [];
   }
@@ -392,6 +448,8 @@ function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [boards, setBoards] = useState(() => readBoards(user));
+  const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
+  const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
 
   useEffect(() => {
     setBoards(readBoards(user));
@@ -420,37 +478,64 @@ function DashboardPage({ user, setUser }) {
     );
   }, [user.name, yourProgress]);
 
-  function createBoard() {
-    const title = window.prompt("Board name:", "My 2026 Goals");
-    if (!title || !title.trim()) {
+  function updateDraftGoal(index, value) {
+    setDraftGoals((previous) => {
+      const next = [...previous];
+      next[index] = index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : value;
+      return next;
+    });
+  }
+
+  function createBoard(event) {
+    event.preventDefault();
+
+    const title = draftTitle.trim();
+    if (!title) {
+      window.alert("Please provide a board name.");
       return;
     }
 
-    const rawTotal = window.prompt("How many goals (squares) should this board have?", "9");
-    const parsedTotal = Number.parseInt(rawTotal || "", 10);
-    const total = Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : 9;
+    const goals = draftGoals.map((goalText, index) => ({
+      id: crypto.randomUUID(),
+      text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : (goalText.trim() || `Goal ${index + 1}`),
+      completed: false
+    }));
 
     setBoards((previous) => [
       ...previous,
       {
         id: crypto.randomUUID(),
         title: title.trim(),
-        total,
-        completed: 0
+        total: FIXED_GOAL_COUNT,
+        completed: 0,
+        goals
       }
     ]);
+
+    setDraftTitle("My 2026 Goals");
+    setDraftGoals(createDraftGoals());
+    setActiveTab("dashboard");
   }
 
-  function incrementBoardProgress(boardId) {
+  function toggleGoal(boardId, goalId) {
     setBoards((previous) =>
       previous.map((board) => {
         if (board.id !== boardId) {
           return board;
         }
 
+        const goals = Array.isArray(board.goals)
+          ? board.goals.map((goal) =>
+            goal.id === goalId
+              ? { ...goal, completed: !goal.completed }
+              : goal
+          )
+          : [];
+
         return {
           ...board,
-          completed: Math.min(board.total, board.completed + 1)
+          goals,
+          completed: goals.filter((goal) => goal.completed).length
         };
       })
     );
@@ -526,7 +611,11 @@ function DashboardPage({ user, setUser }) {
               <div className="empty-state">
                 <h2>No boards yet</h2>
                 <p>Create your first Bingo board to start tracking progress.</p>
-                <button className="btn btn-primary center-action-btn" type="button" onClick={createBoard}>
+                <button
+                  className="btn btn-primary center-action-btn"
+                  type="button"
+                  onClick={() => setActiveTab("create")}
+                >
                   Create a Board
                 </button>
               </div>
@@ -547,9 +636,20 @@ function DashboardPage({ user, setUser }) {
                     <div className="progress-track" aria-hidden="true">
                       <div className="progress-fill" style={{ width: `${completionPercent}%` }}></div>
                     </div>
-                    <button className="inline-btn" type="button" onClick={() => incrementBoardProgress(board.id)}>
-                      Mark 1 goal complete
-                    </button>
+
+                    <div className="bingo-grid" aria-label={`${board.title} goals`}>
+                      {board.goals.map((goal, index) => (
+                        <button
+                          key={goal.id}
+                          className={`bingo-cell ${goal.completed ? "is-done" : ""}`}
+                          type="button"
+                          onClick={() => toggleGoal(board.id, goal.id)}
+                        >
+                          <span className="bingo-cell-index">{index + 1}</span>
+                          <span>{goal.text}</span>
+                        </button>
+                      ))}
+                    </div>
                   </article>
                 );
               })}
@@ -564,13 +664,43 @@ function DashboardPage({ user, setUser }) {
               <p>Build a fresh Bingo board and start tracking your goals today.</p>
             </div>
 
-            <div className="empty-state">
-              <h2>Ready for a new challenge?</h2>
-              <p>Choose a board name and number of goals, then we will add it to your dashboard.</p>
-              <button className="btn btn-primary center-action-btn" type="button" onClick={createBoard}>
-                Create a Board
+            <form className="create-board-form" onSubmit={createBoard}>
+              <label className="field-label" htmlFor="boardTitleInput">Board Name</label>
+              <input
+                id="boardTitleInput"
+                name="boardTitle"
+                className="field-input"
+                type="text"
+                required
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+              />
+
+              <p className="create-help">Fill in your goals below. Goal 13 is fixed as FREE SPACE.</p>
+
+              <div className="create-goal-grid" aria-label="Create board goals">
+                {draftGoals.map((goal, index) => (
+                  <div className={`goal-input-cell ${index === FREE_SPACE_INDEX ? "is-free-space" : ""}`} key={`draft-${index}`}>
+                    <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
+                      {index + 1}
+                    </label>
+                    <input
+                      id={`goal-input-${index}`}
+                      className="goal-input"
+                      type="text"
+                      value={goal}
+                      onChange={(event) => updateDraftGoal(index, event.target.value)}
+                      placeholder={index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`}
+                      readOnly={index === FREE_SPACE_INDEX}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button className="btn btn-primary center-action-btn" type="submit">
+                Create Board
               </button>
-            </div>
+            </form>
           </section>
         )}
 
