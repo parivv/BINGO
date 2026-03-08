@@ -576,25 +576,18 @@ function AuthPage({ setUser, mode, user }) {
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
-<<<<<<< Updated upstream
   const [boards, setBoards] = useState([]);
-=======
-  const [boards, setBoards] = useState(() => readBoards(user));
   const [createStep, setCreateStep] = useState(1);
->>>>>>> Stashed changes
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
   const [draftGameType, setDraftGameType] = useState("five-in-a-row");
   const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
-<<<<<<< Updated upstream
   const [groups, setGroups] = useState([]);
   const [groupLeaderboards, setGroupLeaderboards] = useState([]);
   const [newGroupName, setNewGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [groupNotice, setGroupNotice] = useState("");
-=======
   const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
   const [draftTileShape, setDraftTileShape] = useState("rounded");
->>>>>>> Stashed changes
 
   useEffect(() => {
     let isMounted = true;
@@ -693,10 +686,6 @@ function DashboardPage({ user, setUser }) {
     });
   }
 
-<<<<<<< Updated upstream
-  async function createBoard(event) {
-    event.preventDefault();
-=======
   function resetCreateDraft() {
     setCreateStep(1);
     setDraftTitle("My 2026 Goals");
@@ -705,7 +694,6 @@ function DashboardPage({ user, setUser }) {
     setDraftBoardColor("#c10b3c");
     setDraftTileShape("rounded");
   }
->>>>>>> Stashed changes
 
   function goToCreateStep(nextStep) {
     if (nextStep < 1 || nextStep > CREATE_STEPS.length) {
@@ -720,7 +708,7 @@ function DashboardPage({ user, setUser }) {
     setCreateStep(nextStep);
   }
 
-  function createBoard() {
+  async function createBoard() {
     const title = draftTitle.trim();
     if (!title) {
       window.alert("Please provide a board name.");
@@ -733,24 +721,18 @@ function DashboardPage({ user, setUser }) {
       completed: false
     }));
 
-<<<<<<< Updated upstream
     try {
       const created = await createBoardApi(title.trim(), goals);
       if (created) {
-        setBoards((previous) => [created, ...previous]);
-=======
-    setBoards((previous) => [
-      ...previous,
-      {
-        id: crypto.randomUUID(),
-        title: title.trim(),
-        total: FIXED_GOAL_COUNT,
-        completed: 0,
-        goals,
-        gameType: draftGameType,
-        boardColor: draftBoardColor,
-        tileShape: draftTileShape
->>>>>>> Stashed changes
+        setBoards((previous) => [
+          {
+            ...created,
+            gameType: created.gameType || draftGameType,
+            boardColor: created.boardColor || draftBoardColor,
+            tileShape: created.tileShape || draftTileShape
+          },
+          ...previous
+        ]);
       }
       setGroupNotice("");
     } catch (error) {
