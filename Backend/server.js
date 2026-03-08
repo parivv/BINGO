@@ -70,6 +70,17 @@ const PORT = process.env.PORT || 8000;
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
+const ALLOWED_GAME_TYPES = new Set(["five-in-a-row", "blackout"]);
+const ALLOWED_TILE_SHAPES = new Set(["rounded", "square", "circle"]);
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return "#c10b3c";
+  }
+
+  const trimmed = value.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : "#c10b3c";
+}
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 const FRONTEND_REDIRECT =
   process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
@@ -551,7 +562,7 @@ function normalizeGoals(rawGoals) {
       return {
         id: randomUUID(),
         text: defaultText,
-        completed: false
+        completed: index === FREE_SPACE_INDEX
       };
     }
 
@@ -565,7 +576,7 @@ function normalizeGoals(rawGoals) {
     return {
       id: rawGoal.id || randomUUID(),
       text,
-      completed: Boolean(rawGoal.completed)
+      completed: index === FREE_SPACE_INDEX ? true : Boolean(rawGoal.completed)
     };
   });
 }
@@ -577,14 +588,20 @@ function normalizeBoardPayload(body) {
   }
 
   const goals = normalizeGoals(body?.goals);
-  const completed = goals.filter((goal) => goal.completed).length;
+  const completed = goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length;
+  const gameType = ALLOWED_GAME_TYPES.has(body?.gameType) ? body.gameType : "five-in-a-row";
+  const tileShape = ALLOWED_TILE_SHAPES.has(body?.tileShape) ? body.tileShape : "rounded";
+  const boardColor = normalizeHexColor(body?.boardColor);
 
   return {
     data: {
       title,
       goals,
       total: FIXED_GOAL_COUNT,
-      completed
+      completed,
+      game_type: gameType,
+      board_color: boardColor,
+      shape: tileShape
     }
   };
 }
@@ -597,7 +614,7 @@ app.get("/api/boards", requireAuth, async (req, res) => {
 
   const { data, error } = await supabase
     .from("boards")
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -625,7 +642,7 @@ app.post("/api/boards", requireAuth, async (req, res) => {
       user_id: userId,
       ...normalized.data
     })
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .single();
 
   if (error) {
@@ -652,7 +669,7 @@ app.put("/api/boards/:boardId", requireAuth, async (req, res) => {
     .update(normalized.data)
     .eq("id", boardId)
     .eq("user_id", userId)
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .single();
 
   if (error) {
