@@ -1704,11 +1704,7 @@ function DashboardPage({ user, setUser }) {
           <section className="view-panel" aria-labelledby="createTitle">
             <div className="panel-head">
               <h1 id="createTitle">Create a New Board</h1>
-              <p>
-                Follow each step to build your board setup. The small blank in the top-right of each tile is an optional tally target:
-                if a goal needs to be done more than once, enter the required number there so you can track exactly how far along you
-                are on your dashboard.
-              </p>
+              <p>Follow each step to build your board setup.</p>
               <p className="group-notice" role="status" hidden={!groupNotice}>{groupNotice}</p>
             </div>
 
@@ -1775,7 +1771,7 @@ function DashboardPage({ user, setUser }) {
 
               {createStep === 3 && (
                 <div className="create-step-panel">
-                  <p className="create-help">Add your goals to each tile. Center tile is always FREE SPACE.</p>
+                  <p className="create-help">Add your goals to each square. The small blank in the top-right of each tile is an optional tally target. The center tile is always a FREE SPACE.</p>
 
                   <div className="goal-ai-controls" aria-label="AI goal suggestion controls">
                     <input
@@ -1916,15 +1912,16 @@ function DashboardPage({ user, setUser }) {
                 </div>
               )}
 
-              <div className="create-actions">
-                <button
-                  className="btn btn-outline"
-                  type="button"
-                  onClick={() => goToCreateStep(createStep - 1)}
-                  disabled={createStep === 1}
-                >
-                  Back
-                </button>
+              <div className={`create-actions ${createStep === 1 ? "is-first-step" : ""}`}>
+                {createStep > 1 && (
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() => goToCreateStep(createStep - 1)}
+                  >
+                    Back
+                  </button>
+                )}
 
                 {createStep < CREATE_STEPS.length ? (
                   <button className="btn btn-accent" type="button" onClick={() => goToCreateStep(createStep + 1)}>
@@ -2304,6 +2301,7 @@ function DashboardPage({ user, setUser }) {
             <h2 id="winPopupTitle">Board Beat!</h2>
             <p className="win-popup-board">{winPopup.title}</p>
             <p>{winPopup.message}</p>
+            <img className="win-popup-gif" src={footerVolcanoGif} alt="Erupting volcano celebration" />
             <button className="btn btn-primary" type="button" onClick={() => setWinPopup(null)}>
               Awesome
             </button>

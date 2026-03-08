@@ -668,6 +668,7 @@ p {
   color: var(--ink);
   cursor: pointer;
   display: grid;
+  font-family: var(--font-body);
   gap: 0.3rem;
   padding: 0.8rem;
   text-align: left;
@@ -679,11 +680,15 @@ p {
 }
 
 .game-type-card strong {
+  font-family: var(--font-body);
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .game-type-card span {
+  font-family: var(--font-body);
   font-size: 0.86rem;
+  font-weight: 700;
   line-height: 1.35;
 }
 
@@ -805,6 +810,10 @@ p {
   display: flex;
   justify-content: space-between;
   margin-top: 0.3rem;
+}
+
+.create-actions.is-first-step {
+  justify-content: center;
 }
 
 .create-actions .btn:disabled {
@@ -1144,6 +1153,14 @@ p {
 .win-popup-board {
   font-size: 1.08rem;
   font-weight: 800;
+}
+
+.win-popup-gif {
+  border-radius: 10px;
+  display: block;
+  justify-self: center;
+  max-width: 460px;
+  width: min(100%, 460px);
 }
 
 .win-popup .btn {
