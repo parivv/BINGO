@@ -218,6 +218,10 @@ function resolveDisplayName(name, email) {
   return username || "Player";
 }
 
+function hasEmailDomain(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 function normalizeUser(rawUser) {
   if (!rawUser || typeof rawUser !== "object") {
     return null;
@@ -461,7 +465,7 @@ function LandingPage({ user }) {
           <div className="landing-hero-copy">
             <h1 id="hero-title">Turn Your Goals Into An Explosive Challenge</h1>
             <p className="hero-copy">
-              Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt.
+              Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt!
             </p>
             <button className="btn btn-accent btn-lg" type="button" onClick={() => navigate("/signup")}>
               Start Your Battle
@@ -555,6 +559,11 @@ function AuthPage({ setUser, mode, user }) {
     if (isSignup) {
       if (!trimmedEmail || !trimmedUsername || !password) {
         setError("Email, username, and password are required.");
+        return;
+      }
+
+      if (!hasEmailDomain(trimmedEmail)) {
+        setError("Please enter a valid email with a domain (for example, name@example.com).");
         return;
       }
     } else if (!trimmedIdentifier || !password) {
@@ -736,6 +745,7 @@ function AuthPage({ setUser, mode, user }) {
           <p className="auth-error" role="alert" hidden={!error}>
             {error}
           </p>
+
         </section>
       </main>
 

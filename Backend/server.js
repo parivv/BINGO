@@ -855,9 +855,13 @@ app.post('/auth/signup', async (req, res) => {
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   const usernameCandidate = typeof username === 'string' && username.trim() ? username : name;
   const normalizedUsername = typeof usernameCandidate === 'string' ? usernameCandidate.trim() : '';
+  const hasEmailDomain = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 
   if (!normalizedEmail || !normalizedUsername || !password)
     return res.status(400).json({ error: 'All fields required' });
+
+  if (!hasEmailDomain)
+    return res.status(400).json({ error: 'Please enter a valid email with a domain' });
 
   const { data: existingEmailUser } = await supabase
     .from('users').select('*').eq('email', normalizedEmail).maybeSingle();
