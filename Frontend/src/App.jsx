@@ -159,11 +159,15 @@ function normalizeGroup(rawGroup) {
     }
 
     const displayName = typeof member.name === "string" && member.name.trim() ? member.name.trim() : "Player";
-    memberMap.set(member.id, { id: member.id, name: displayName });
+    memberMap.set(member.id, {
+      id: member.id,
+      name: displayName,
+      assignedBoardId: member.assignedBoardId || member.assigned_board_id || null
+    });
   });
 
   if (!memberMap.has(ownerId)) {
-    memberMap.set(ownerId, { id: ownerId, name: "Player" });
+    memberMap.set(ownerId, { id: ownerId, name: "Player", assignedBoardId: null });
   }
 
   return {
@@ -258,6 +262,15 @@ async function joinGroupApi(code) {
 async function fetchGroupLeaderboardApi(groupId) {
   const payload = await apiRequest(`/api/groups/${groupId}/leaderboard`, { method: "GET" });
   return Array.isArray(payload.entries) ? payload.entries : [];
+}
+
+async function assignGroupBoardApi(groupId, boardId) {
+  const payload = await apiRequest(`/api/groups/${groupId}/assignment`, {
+    method: "PUT",
+    body: JSON.stringify({ boardId: boardId || null })
+  });
+
+  return payload;
 }
 
 function readUser() {
@@ -586,6 +599,7 @@ function DashboardPage({ user, setUser }) {
   const [newGroupName, setNewGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [groupNotice, setGroupNotice] = useState("");
+  const [assignmentDraftByGroup, setAssignmentDraftByGroup] = useState({});
   const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
   const [draftTileShape, setDraftTileShape] = useState("rounded");
 
@@ -641,6 +655,15 @@ function DashboardPage({ user, setUser }) {
     () => groups.filter((group) => group.members.some((member) => member.id === user.id)),
     [groups, user.id]
   );
+
+  useEffect(() => {
+    const nextDrafts = {};
+    userGroups.forEach((group) => {
+      const membership = group.members.find((member) => member.id === user.id);
+      nextDrafts[group.id] = membership?.assignedBoardId || "";
+    });
+    setAssignmentDraftByGroup(nextDrafts);
+  }, [user.id, userGroups]);
 
   useEffect(() => {
     let isMounted = true;
@@ -786,6 +809,24 @@ function DashboardPage({ user, setUser }) {
     } catch (error) {
       setGroupNotice(error.message || "Could not join group.");
     }
+  }
+
+  async function assignBoardToGroup(groupId) {
+    const selectedBoardId = assignmentDraftByGroup[groupId] || null;
+
+    try {
+      await assignGroupBoardApi(groupId, selectedBoardId);
+      const latestGroups = await fetchGroupsApi();
+      setGroups(latestGroups);
+      setGroupNotice(selectedBoardId ? "Assigned board to group leaderboard." : "Cleared assigned board for this group.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not assign board to group.");
+    }
+  }
+
+  function getBoardTitle(boardId) {
+    const matchedBoard = boards.find((board) => board.id === boardId);
+    return matchedBoard ? matchedBoard.title : "No board assigned";
   }
 
   async function toggleGoal(boardId, goalId) {
@@ -1117,7 +1158,7 @@ function DashboardPage({ user, setUser }) {
           <section className="view-panel" aria-labelledby="leaderboardTitle">
             <div className="panel-head">
               <h1 id="leaderboardTitle">Leaderboard</h1>
-              <p>Each group has its own leaderboard, ranked by average board progress.</p>
+              <p>Each group is ranked by the single board each member assigns to that group.</p>
             </div>
 
             {groupLeaderboards.length === 0 && (
@@ -1139,8 +1180,8 @@ function DashboardPage({ user, setUser }) {
                       <tr>
                         <th>Rank</th>
                         <th>Name</th>
+                        <th>Assigned Board</th>
                         <th>Progress</th>
-                        <th>Boards</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1148,8 +1189,8 @@ function DashboardPage({ user, setUser }) {
                         <tr key={`${groupBoard.id}-${entry.id}`} className={entry.isSelf ? "self" : ""}>
                           <td>{index + 1}</td>
                           <td>{entry.name}</td>
+                          <td>{entry.assignedBoardTitle || "Not assigned"}</td>
                           <td>{entry.progress}%</td>
-                          <td>{entry.boardCount}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1218,6 +1259,12 @@ function DashboardPage({ user, setUser }) {
               <div className="group-list">
                 {userGroups.map((group) => (
                   <article className="group-card" key={group.id}>
+                    {(() => {
+                      const membership = group.members.find((member) => member.id === user.id);
+                      const assignedBoardId = membership?.assignedBoardId || "";
+
+                      return (
+                        <>
                     <h3>{group.name}</h3>
                     <p>
                       Group code: <strong>{group.code}</strong>
@@ -1226,6 +1273,45 @@ function DashboardPage({ user, setUser }) {
                     <p>
                       Role: {group.ownerId === user.id ? "Owner" : "Member"}
                     </p>
+
+                    <label className="field-label" htmlFor={`assignment-${group.id}`}>
+                      Leaderboard Board
+                    </label>
+                    <div className="group-form-row">
+                      <select
+                        id={`assignment-${group.id}`}
+                        className="field-input"
+                        value={assignmentDraftByGroup[group.id] ?? assignedBoardId}
+                        onChange={(event) =>
+                          setAssignmentDraftByGroup((previous) => ({
+                            ...previous,
+                            [group.id]: event.target.value
+                          }))
+                        }
+                      >
+                        <option value="">No board assigned</option>
+                        {boards.map((board) => (
+                          <option key={board.id} value={board.id}>
+                            {board.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => assignBoardToGroup(group.id)}
+                        disabled={boards.length === 0}
+                      >
+                        Save
+                      </button>
+                    </div>
+
+                    <p>
+                      Current assignment: <strong>{getBoardTitle(assignedBoardId)}</strong>
+                    </p>
+                        </>
+                      );
+                    })()}
                   </article>
                 ))}
               </div>
@@ -1240,35 +1326,31 @@ function DashboardPage({ user, setUser }) {
 }
 
 function DashboardGate({ user, setUser }) {
-  const [loading, setLoading] = useState(!user);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     async function syncUserFromSession() {
-      if (user) {
-        setLoading(false);
-        return;
-      }
-
       try {
         const response = await fetch(`${API_ORIGIN}/auth/me`, {
           credentials: "include"
         });
 
-        console.log('auth/me status:', response.status);
-
         if (!response.ok) {
           if (isMounted) {
+            localStorage.removeItem(STORAGE_KEYS.user);
+            setUser(null);
             setLoading(false);
           }
           return;
         }
 
         const payload = await response.json();
-        console.log('auth/me payload:', payload);
         if (!payload?.authenticated || !payload?.user) {
           if (isMounted) {
+            localStorage.removeItem(STORAGE_KEYS.user);
+            setUser(null);
             setLoading(false);
           }
           return;
@@ -1288,8 +1370,9 @@ function DashboardGate({ user, setUser }) {
           setLoading(false);
         }
       } catch (_error) {
-        console.log('syncUserFromSession error:', _error);
         if (isMounted) {
+          localStorage.removeItem(STORAGE_KEYS.user);
+          setUser(null);
           setLoading(false);
         }
       }
@@ -1300,7 +1383,7 @@ function DashboardGate({ user, setUser }) {
     return () => {
       isMounted = false;
     };
-  }, [setUser, user]);
+  }, [setUser]);
 
   if (loading) {
     return (
