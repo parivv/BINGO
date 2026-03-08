@@ -69,6 +69,59 @@ const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const FRONTEND_REDIRECT =
   process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
+const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
+function toOrigin(value) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch (_error) {
+    return "";
+  }
+}
+
+function getRequestOrigin(req) {
+  const headerOrigin = req.get("origin");
+  if (headerOrigin) {
+    return headerOrigin;
+  }
+
+  const referer = req.get("referer");
+  return toOrigin(referer);
+}
+
+const FRONTEND_ORIGIN_BASE = toOrigin(FRONTEND_ORIGIN) || FRONTEND_ORIGIN;
+
+function isAllowedFrontendRedirect(redirectUrl) {
+  if (!redirectUrl) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(redirectUrl);
+    const origin = parsed.origin;
+    return origin === FRONTEND_ORIGIN_BASE || LOCAL_ORIGIN_PATTERN.test(origin);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function resolveOAuthRedirect(req) {
+  const requestedRedirect = typeof req.query.redirect === "string" ? req.query.redirect : "";
+  if (isAllowedFrontendRedirect(requestedRedirect)) {
+    return requestedRedirect;
+  }
+
+  const reqOrigin = getRequestOrigin(req);
+  if (LOCAL_ORIGIN_PATTERN.test(reqOrigin)) {
+    return `${reqOrigin}/dashboard`;
+  }
+
+  return FRONTEND_REDIRECT;
+}
 const HAS_GOOGLE_OAUTH =
   Boolean(process.env.GOOGLE_CLIENT_ID) &&
   Boolean(process.env.GOOGLE_CLIENT_SECRET) &&
@@ -80,7 +133,19 @@ if (!HAS_GOOGLE_OAUTH) {
   );
 }
 
-app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow non-browser requests and local dev ports by default.
+      if (!origin || origin === FRONTEND_ORIGIN_BASE || LOCAL_ORIGIN_PATTERN.test(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(
   session({
@@ -145,11 +210,16 @@ app.get(
     if (!HAS_GOOGLE_OAUTH) {
       return oauthNotConfigured(res);
     }
+
+    req.session.oauthRedirect = resolveOAuthRedirect(req);
+    console.log('OAuth redirect set to:', req.session.oauthRedirect);
+
     return next();
   },
   passport.authenticate("google", {
     scope: ["profile", "email"],
-    prompt: "select_account",
+    prompt: "consent select_account",
+    max_age: 0,
   })
 );
 
@@ -163,7 +233,12 @@ app.get(
   },
   passport.authenticate("google", { failureRedirect: `${FRONTEND_ORIGIN}/` }),
   (req, res) => {
-    res.redirect(FRONTEND_REDIRECT);
+    const redirectTarget = isAllowedFrontendRedirect(req.session.oauthRedirect)
+      ? req.session.oauthRedirect
+      : FRONTEND_REDIRECT;
+
+    delete req.session.oauthRedirect;
+    res.redirect(redirectTarget);
   }
 );
 

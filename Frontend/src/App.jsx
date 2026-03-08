@@ -6,7 +6,11 @@ const STORAGE_KEYS = {
   boards: "bingo-battles.boards"
 };
 
-const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || "http://localhost:5000";
+const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
+const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:5000";
+const API_ORIGIN = OAUTH_BACKEND_ORIGIN;
+const APP_BASE = import.meta.env.BASE_URL || "/";
+const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BASE;
 
 function toUsername(value) {
   if (typeof value !== "string") {
@@ -214,7 +218,8 @@ function AuthPage({ setUser, mode, user }) {
 
     try {
       const endpoint = isSignup ? '/auth/signup' : '/auth/login';
-      const response = await fetch(`${BACKEND_ORIGIN}${endpoint}`, {
+
+      const response = await fetch(`${API_ORIGIN}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -225,10 +230,17 @@ function AuthPage({ setUser, mode, user }) {
         )
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data = {};
+
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (_parseError) {
+        data = {};
+      }
 
       if (!response.ok) {
-        setError(data.error || 'Authentication failed');
+        setError(data.error || `${isSignup ? "Sign up" : "Log in"} failed (${response.status}).`);
         return;
       }
 
@@ -241,8 +253,9 @@ function AuthPage({ setUser, mode, user }) {
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(nextUser));
       setUser(nextUser);
       navigate("/dashboard");
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (_error) {
+      const target = API_ORIGIN || "Vite proxy -> http://localhost:5000";
+      setError(`Cannot reach backend via ${target}. Make sure backend is running.`);
     }
   }
 
@@ -339,7 +352,8 @@ function AuthPage({ setUser, mode, user }) {
             type="button"
             className="btn btn-outline btn-lg auth-google-btn"
             onClick={() => {
-              window.location.href = `${BACKEND_ORIGIN}/auth/google`;
+              const redirect = `${window.location.origin}${APP_BASE_PREFIX}/dashboard`;
+              window.location.href = `${OAUTH_BACKEND_ORIGIN}/auth/google?redirect=${encodeURIComponent(redirect)}`;
             }}
           >
             Continue with Google
@@ -444,7 +458,7 @@ function DashboardPage({ user, setUser }) {
 
   async function signOut() {
     try {
-      await fetch(`${BACKEND_ORIGIN}/auth/logout`, {
+      await fetch(`${API_ORIGIN}/auth/logout`, {
         method: "POST",
         credentials: "include"
       });
@@ -624,7 +638,7 @@ function DashboardGate({ user, setUser }) {
       }
 
       try {
-        const response = await fetch(`${BACKEND_ORIGIN}/auth/me`, {
+        const response = await fetch(`${API_ORIGIN}/auth/me`, {
           credentials: "include"
         });
 
