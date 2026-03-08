@@ -919,6 +919,12 @@ function DashboardPage({ user, setUser }) {
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState(null);
+  const [editingBoard, setEditingBoard] = useState(null);
+  const [editingGoals, setEditingGoals] = useState([]);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingBoardColor, setEditingBoardColor] = useState("#c10b3c");
+  const [editingTileShape, setEditingTileShape] = useState("rounded");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -1447,6 +1453,81 @@ function DashboardPage({ user, setUser }) {
     }
   }
 
+  function openEditBoard(board) {
+    if (!board?.id) return;
+    setEditingBoard(board);
+    setEditingTitle(board.title || "");
+    setEditingGoals(JSON.parse(JSON.stringify(board.goals || [])));
+    setEditingBoardColor(board.boardColor || "#c10b3c");
+    setEditingTileShape(board.tileShape || "rounded");
+  }
+
+  function closeEditBoard() {
+    setEditingBoard(null);
+    setEditingTitle("");
+    setEditingGoals([]);
+    setEditingBoardColor("#c10b3c");
+    setEditingTileShape("rounded");
+    setIsSavingEdit(false);
+  }
+
+  async function saveEditBoard() {
+    if (!editingBoard?.id || !editingTitle.trim()) {
+      setGroupNotice("Board title is required.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setGroupNotice("");
+
+    try {
+      const payload = {
+        title: editingTitle.trim(),
+        goals: editingGoals,
+        boardColor: editingBoardColor,
+        tileShape: editingTileShape,
+        gameType: editingBoard.gameType || "five-in-a-row"
+      };
+
+      const response = await fetch(`${API_ORIGIN}/api/boards/${editingBoard.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update board.");
+      }
+
+      const { board: rawBoard } = await response.json();
+      const updatedBoard = normalizeBoard(rawBoard);
+      
+      if (!updatedBoard) {
+        throw new Error("Invalid board response from server.");
+      }
+      
+      setBoards((previous) =>
+        previous.map((b) => (b.id === editingBoard.id ? updatedBoard : b))
+      );
+      closeEditBoard();
+      setGroupNotice("Board updated successfully.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not update board.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  function updateEditingGoal(index, text) {
+    const updated = [...editingGoals];
+    if (updated[index]) {
+      updated[index] = { ...updated[index], text };
+      setEditingGoals(updated);
+    }
+  }
+
   async function signOut() {
     try {
       await fetch(`${API_ORIGIN}/auth/logout`, {
@@ -1685,14 +1766,44 @@ function DashboardPage({ user, setUser }) {
                         </button>
                       ))}
                     </div>
-                    <button
-                      className="btn btn-outline board-delete-btn"
-                      type="button"
-                      onClick={() => requestDeleteBoard(board)}
-                      disabled={deletingBoardId === board.id}
-                    >
-                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
-                    </button>
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+                      <button
+                        className="btn btn-outline board-delete-btn"
+                        type="button"
+                        onClick={() => requestDeleteBoard(board)}
+                        disabled={deletingBoardId === board.id}
+                        style={{ flex: 0.7 }}
+                      >
+                        {deletingBoardId === board.id ? "Deleting..." : "Delete"}
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => openEditBoard(board)}
+                        disabled={isSavingEdit}
+                        style={{ 
+                          flex: 1.3,
+                          background: "#ffffff",
+                          border: "2px solid #ffffff",
+                          color: "#ee8207",
+                          fontSize: "0.85rem",
+                          fontWeight: "600",
+                          padding: "0.5rem 0.75rem",
+                          cursor: "pointer",
+                          transition: "all 150ms ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = "#f0f0f0";
+                          e.target.style.borderColor = "#ee8207";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = "#ffffff";
+                          e.target.style.borderColor = "#ffffff";
+                        }}
+                      >
+                        {isSavingEdit ? "Saving..." : "Edit"}
+                      </button>
+                    </div>
                   </article>
                 );
               })}
@@ -2126,6 +2237,105 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
       </main>
+
+      {editingBoard && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeEditBoard}>
+          <section
+            className="win-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editBoardTitle"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "500px", maxHeight: "80vh", overflowY: "auto" }}
+          >
+            <h2 id="editBoardTitle">Edit Board</h2>
+            
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveEditBoard();
+              }}
+              style={{ display: "grid", gap: "1rem" }}
+            >
+              <div>
+                <label className="field-label" htmlFor="editBoardNameInput">Board Name</label>
+                <input
+                  id="editBoardNameInput"
+                  className="field-input"
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  disabled={isSavingEdit}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="field-label">Board Color</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+                  {BOARD_COLOR_OPTIONS.map((color) => {
+                    const isSelected = editingBoardColor === color;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-option ${isSelected ? "is-selected" : ""}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setEditingBoardColor(color)}
+                        disabled={isSavingEdit}
+                        aria-label={`Select color ${color}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Tile Shape</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem" }}>
+                  {TILE_SHAPE_OPTIONS.map((shape) => {
+                    const isSelected = editingTileShape === shape.id;
+                    return (
+                      <button
+                        key={shape.id}
+                        type="button"
+                        className="btn"
+                        style={{
+                          backgroundColor: isSelected ? "var(--accent-soft)" : "var(--paper)",
+                          borderColor: "var(--stroke)",
+                          color: "var(--ink)"
+                        }}
+                        onClick={() => setEditingTileShape(shape.id)}
+                        disabled={isSavingEdit}
+                      >
+                        {shape.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEditBoard}
+                  disabled={isSavingEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSavingEdit}
+                >
+                  {isSavingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       {deletePopupBoard && (
         <div className="win-popup-backdrop" role="presentation" onClick={closeDeletePopup}>

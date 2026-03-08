@@ -1012,20 +1012,23 @@ p {
 }
 
 .board-delete-btn {
-  justify-self: start;
-  background: rgba(244, 249, 233, 0.16);
-  border-color: rgba(244, 249, 233, 0.72);
-  color: #f4f9e9;
-  font-size: 0.78rem;
-  padding: 0.38rem 0.62rem;
+  background: #ffffff;
+  border: 2px solid #ffffff;
+  color: #c10b3c;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: all 150ms ease;
 }
 
-.board-delete-btn:hover {
-  background: rgba(244, 249, 233, 0.28);
+.board-delete-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #c10b3c;
 }
 
 .board-delete-btn:disabled {
-  opacity: 0.65;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
