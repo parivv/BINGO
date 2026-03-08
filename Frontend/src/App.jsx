@@ -7,8 +7,7 @@ import friendsIcon from "../Friends_Icon.png";
 import volcaneSVG from "../Volcano_SVG.svg";
 
 const STORAGE_KEYS = {
-  user: "bingo-battles.user",
-  boards: "bingo-battles.boards"
+  user: "bingo-battles.user"
 };
 
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
@@ -19,6 +18,25 @@ const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BAS
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
+const CREATE_STEPS = ["Board Name", "Game Type", "Add Goals", "Customize"];
+const GAME_TYPE_OPTIONS = [
+  {
+    id: "five-in-a-row",
+    title: "5-in-a-Row",
+    description: "Complete any row, column, or diagonal to win."
+  },
+  {
+    id: "blackout",
+    title: "Blackout",
+    description: "Complete all 25 tiles for the ultimate challenge."
+  }
+];
+const BOARD_COLOR_OPTIONS = ["#c10b3c", "#ee8207", "#87082a", "#342020", "#7f5af0", "#e2459a", "#1fb37f", "#22a8c1"];
+const TILE_SHAPE_OPTIONS = [
+  { id: "rounded", label: "Rounded" },
+  { id: "square", label: "Square" },
+  { id: "circle", label: "Circle" }
+];
 
 function createDraftGoals() {
   return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) =>
@@ -65,7 +83,10 @@ function normalizeBoard(rawBoard) {
     title: typeof rawBoard.title === "string" && rawBoard.title.trim() ? rawBoard.title.trim() : "Untitled Board",
     total: FIXED_GOAL_COUNT,
     completed,
-    goals: normalizedGoals
+    goals: normalizedGoals,
+    gameType: rawBoard.gameType || "five-in-a-row",
+    boardColor: rawBoard.boardColor || "#c10b3c",
+    tileShape: rawBoard.tileShape || "rounded"
   };
 }
 
@@ -108,13 +129,135 @@ function normalizeUser(rawUser) {
   };
 }
 
-function getBoardsStorageKey(user) {
-  const normalized = normalizeUser(user);
-  if (!normalized) {
+function calculateProgressFromBoards(boards) {
+  if (!Array.isArray(boards) || boards.length === 0) {
+    return 0;
+  }
+
+  return Math.round(
+    boards.reduce((sum, board) => sum + Math.round((board.completed / board.total) * 100), 0) / boards.length
+  );
+}
+
+function normalizeGroup(rawGroup) {
+  if (!rawGroup || typeof rawGroup !== "object") {
     return null;
   }
 
-  return `${STORAGE_KEYS.boards}:${normalized.id}`;
+  const name = typeof rawGroup.name === "string" ? rawGroup.name.trim() : "";
+  const code = typeof rawGroup.code === "string" ? rawGroup.code.trim().toUpperCase() : "";
+  const ownerId = rawGroup.ownerId || rawGroup.owner_user_id || "";
+  if (!name || !code || !ownerId) {
+    return null;
+  }
+
+  const memberMap = new Map();
+  const rawMembers = Array.isArray(rawGroup.members) ? rawGroup.members : [];
+  rawMembers.forEach((member) => {
+    if (!member || typeof member !== "object" || !member.id) {
+      return;
+    }
+
+    const displayName = typeof member.name === "string" && member.name.trim() ? member.name.trim() : "Player";
+    memberMap.set(member.id, { id: member.id, name: displayName });
+  });
+
+  if (!memberMap.has(ownerId)) {
+    memberMap.set(ownerId, { id: ownerId, name: "Player" });
+  }
+
+  return {
+    id: rawGroup.id || crypto.randomUUID(),
+    name,
+    code,
+    ownerId,
+    members: [...memberMap.values()]
+  };
+}
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_ORIGIN}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+
+  const text = await response.text();
+  let payload = {};
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch (_error) {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error || `Request failed (${response.status})`);
+  }
+
+  return payload;
+}
+
+async function fetchBoardsApi() {
+  const payload = await apiRequest("/api/boards", { method: "GET" });
+  const boards = Array.isArray(payload.boards) ? payload.boards : [];
+  return boards.map(normalizeBoard).filter(Boolean);
+}
+
+async function createBoardApi(title, goals) {
+  const payload = await apiRequest("/api/boards", {
+    method: "POST",
+    body: JSON.stringify({ title, goals })
+  });
+
+  return normalizeBoard(payload.board);
+}
+
+async function updateBoardApi(board) {
+  const payload = await apiRequest(`/api/boards/${board.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: board.title,
+      goals: board.goals
+    })
+  });
+
+  return normalizeBoard(payload.board);
+}
+
+async function fetchGroupsApi() {
+  const payload = await apiRequest("/api/groups", { method: "GET" });
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+  return groups.map(normalizeGroup).filter(Boolean);
+}
+
+async function createGroupApi(name) {
+  const payload = await apiRequest("/api/groups", {
+    method: "POST",
+    body: JSON.stringify({ name })
+  });
+
+  return normalizeGroup(payload.group);
+}
+
+async function joinGroupApi(code) {
+  const payload = await apiRequest("/api/groups/join", {
+    method: "POST",
+    body: JSON.stringify({ code })
+  });
+
+  return {
+    group: normalizeGroup(payload.group),
+    alreadyMember: Boolean(payload.alreadyMember),
+    joined: Boolean(payload.joined)
+  };
+}
+
+async function fetchGroupLeaderboardApi(groupId) {
+  const payload = await apiRequest(`/api/groups/${groupId}/leaderboard`, { method: "GET" });
+  return Array.isArray(payload.entries) ? payload.entries : [];
 }
 
 function readUser() {
@@ -128,38 +271,6 @@ function readUser() {
   } catch (_error) {
     return null;
   }
-}
-
-function readBoards(user) {
-  const key = getBoardsStorageKey(user);
-  if (!key) {
-    return [];
-  }
-
-  const raw = localStorage.getItem(key);
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map(normalizeBoard).filter(Boolean);
-  } catch (_error) {
-    return [];
-  }
-}
-
-function writeBoards(user, boards) {
-  const key = getBoardsStorageKey(user);
-  if (!key) {
-    return;
-  }
-
-  localStorage.setItem(key, JSON.stringify(boards));
 }
 
 function AmbientBackground() {
@@ -465,36 +576,114 @@ function AuthPage({ setUser, mode, user }) {
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
+<<<<<<< Updated upstream
+  const [boards, setBoards] = useState([]);
+=======
   const [boards, setBoards] = useState(() => readBoards(user));
+  const [createStep, setCreateStep] = useState(1);
+>>>>>>> Stashed changes
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
+  const [draftGameType, setDraftGameType] = useState("five-in-a-row");
   const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
+<<<<<<< Updated upstream
+  const [groups, setGroups] = useState([]);
+  const [groupLeaderboards, setGroupLeaderboards] = useState([]);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [groupNotice, setGroupNotice] = useState("");
+=======
+  const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
+  const [draftTileShape, setDraftTileShape] = useState("rounded");
+>>>>>>> Stashed changes
 
   useEffect(() => {
-    setBoards(readBoards(user));
-  }, [user]);
+    let isMounted = true;
+
+    async function loadBoards() {
+      try {
+        const apiBoards = await fetchBoardsApi();
+        if (isMounted) {
+          setBoards(apiBoards);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGroupNotice(error.message || "Could not load boards.");
+        }
+      }
+    }
+
+    void loadBoards();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
 
   useEffect(() => {
-    writeBoards(user, boards);
-  }, [boards, user]);
+    let isMounted = true;
 
-  const yourProgress = boards.length
-    ? Math.round(
-      boards.reduce((sum, board) => sum + Math.round((board.completed / board.total) * 100), 0) / boards.length
-    )
-    : 0;
+    async function loadGroups() {
+      try {
+        const apiGroups = await fetchGroupsApi();
+        if (isMounted) {
+          setGroups(apiGroups);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGroupNotice(error.message || "Could not load groups.");
+        }
+      }
+    }
 
-  const rankings = useMemo(() => {
-    const friends = [
-      { name: "Avery", progress: 72 },
-      { name: "Kai", progress: 64 },
-      { name: "Rin", progress: 49 },
-      { name: "Milo", progress: 33 }
-    ];
+    void loadGroups();
 
-    return [{ name: user.name, progress: yourProgress, isSelf: true }, ...friends].sort(
-      (a, b) => b.progress - a.progress
-    );
-  }, [user.name, yourProgress]);
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
+
+  const yourProgress = calculateProgressFromBoards(boards);
+
+  const userGroups = useMemo(
+    () => groups.filter((group) => group.members.some((member) => member.id === user.id)),
+    [groups, user.id]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadGroupLeaderboards() {
+      if (userGroups.length === 0) {
+        setGroupLeaderboards([]);
+        return;
+      }
+
+      try {
+        const allEntries = await Promise.all(
+          userGroups.map(async (group) => ({
+            id: group.id,
+            name: group.name,
+            code: group.code,
+            entries: await fetchGroupLeaderboardApi(group.id)
+          }))
+        );
+
+        if (isMounted) {
+          setGroupLeaderboards(allEntries);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGroupNotice(error.message || "Could not load group leaderboards.");
+        }
+      }
+    }
+
+    void loadGroupLeaderboards();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userGroups]);
 
   function updateDraftGoal(index, value) {
     setDraftGoals((previous) => {
@@ -504,9 +693,34 @@ function DashboardPage({ user, setUser }) {
     });
   }
 
-  function createBoard(event) {
+<<<<<<< Updated upstream
+  async function createBoard(event) {
     event.preventDefault();
+=======
+  function resetCreateDraft() {
+    setCreateStep(1);
+    setDraftTitle("My 2026 Goals");
+    setDraftGameType("five-in-a-row");
+    setDraftGoals(createDraftGoals());
+    setDraftBoardColor("#c10b3c");
+    setDraftTileShape("rounded");
+  }
+>>>>>>> Stashed changes
 
+  function goToCreateStep(nextStep) {
+    if (nextStep < 1 || nextStep > CREATE_STEPS.length) {
+      return;
+    }
+
+    if (nextStep > createStep && createStep === 1 && !draftTitle.trim()) {
+      window.alert("Please provide a board name before continuing.");
+      return;
+    }
+
+    setCreateStep(nextStep);
+  }
+
+  function createBoard() {
     const title = draftTitle.trim();
     if (!title) {
       window.alert("Please provide a board name.");
@@ -519,6 +733,12 @@ function DashboardPage({ user, setUser }) {
       completed: false
     }));
 
+<<<<<<< Updated upstream
+    try {
+      const created = await createBoardApi(title.trim(), goals);
+      if (created) {
+        setBoards((previous) => [created, ...previous]);
+=======
     setBoards((previous) => [
       ...previous,
       {
@@ -526,37 +746,97 @@ function DashboardPage({ user, setUser }) {
         title: title.trim(),
         total: FIXED_GOAL_COUNT,
         completed: 0,
-        goals
+        goals,
+        gameType: draftGameType,
+        boardColor: draftBoardColor,
+        tileShape: draftTileShape
+>>>>>>> Stashed changes
       }
-    ]);
+      setGroupNotice("");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not create board.");
+      return;
+    }
 
-    setDraftTitle("My 2026 Goals");
-    setDraftGoals(createDraftGoals());
+    resetCreateDraft();
     setActiveTab("dashboard");
   }
 
-  function toggleGoal(boardId, goalId) {
-    setBoards((previous) =>
-      previous.map((board) => {
-        if (board.id !== boardId) {
-          return board;
-        }
+  async function createGroup(event) {
+    event.preventDefault();
+    const name = newGroupName.trim();
+    if (!name) {
+      setGroupNotice("Please enter a group name.");
+      return;
+    }
 
-        const goals = Array.isArray(board.goals)
-          ? board.goals.map((goal) =>
-            goal.id === goalId
-              ? { ...goal, completed: !goal.completed }
-              : goal
-          )
-          : [];
+    try {
+      const created = await createGroupApi(name);
+      if (created) {
+        setGroups((previous) => [...previous, created]);
+        setGroupNotice(`Created \"${created.name}\". Share code ${created.code} to invite others.`);
+      }
+      setNewGroupName("");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not create group.");
+    }
+  }
 
-        return {
-          ...board,
-          goals,
-          completed: goals.filter((goal) => goal.completed).length
-        };
-      })
-    );
+  async function joinGroup(event) {
+    event.preventDefault();
+    const normalizedCode = joinCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      setGroupNotice("Please enter a group code.");
+      return;
+    }
+
+    try {
+      const joinedPayload = await joinGroupApi(normalizedCode);
+      if (joinedPayload.alreadyMember) {
+        setGroupNotice("You are already in that group.");
+      } else {
+        setGroupNotice(`Joined ${joinedPayload.group?.name || "group"}.`);
+      }
+
+      const latestGroups = await fetchGroupsApi();
+      setGroups(latestGroups);
+      setJoinCode("");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not join group.");
+    }
+  }
+
+  async function toggleGoal(boardId, goalId) {
+    const currentBoard = boards.find((board) => board.id === boardId);
+    if (!currentBoard) {
+      return;
+    }
+
+    const goals = Array.isArray(currentBoard.goals)
+      ? currentBoard.goals.map((goal) =>
+        goal.id === goalId
+          ? { ...goal, completed: !goal.completed }
+          : goal
+      )
+      : [];
+
+    const optimisticBoard = {
+      ...currentBoard,
+      goals,
+      completed: goals.filter((goal) => goal.completed).length
+    };
+
+    setBoards((previous) => previous.map((board) => (board.id === boardId ? optimisticBoard : board)));
+
+    try {
+      const updated = await updateBoardApi(optimisticBoard);
+      if (updated) {
+        setBoards((previous) => previous.map((board) => (board.id === boardId ? updated : board)));
+      }
+    } catch (_error) {
+      setBoards((previous) => previous.map((board) => (board.id === boardId ? currentBoard : board)));
+      setGroupNotice("Could not save goal progress.");
+    }
   }
 
   async function signOut() {
@@ -633,7 +913,10 @@ function DashboardPage({ user, setUser }) {
                 <button
                   className="btn btn-accent center-action-btn"
                   type="button"
-                  onClick={() => setActiveTab("create")}
+                  onClick={() => {
+                    resetCreateDraft();
+                    setActiveTab("create");
+                  }}
                 >
                   Create a Board
                 </button>
@@ -679,47 +962,172 @@ function DashboardPage({ user, setUser }) {
         {activeTab === "create" && (
           <section className="view-panel" aria-labelledby="createTitle">
             <div className="panel-head">
-              <h1 id="createTitle">Create a New Card</h1>
-              <p>Build a fresh Bingo board and start tracking your goals today.</p>
+              <h1 id="createTitle">Create a New Board</h1>
+              <p>Follow each step to build your board setup.</p>
             </div>
 
-            <form className="create-board-form" onSubmit={createBoard}>
-              <label className="field-label" htmlFor="boardTitleInput">Board Name</label>
-              <input
-                id="boardTitleInput"
-                name="boardTitle"
-                className="field-input"
-                type="text"
-                required
-                value={draftTitle}
-                onChange={(event) => setDraftTitle(event.target.value)}
-              />
+            <div className="create-board-form create-wizard">
+              <div className="create-stepbar" aria-label="Create board progress">
+                {CREATE_STEPS.map((stepLabel, index) => {
+                  const stepNumber = index + 1;
+                  const statusClass =
+                    stepNumber < createStep ? "is-complete" : stepNumber === createStep ? "is-active" : "";
 
-              <p className="create-help">Fill in your goals below. Goal 13 is fixed as FREE SPACE.</p>
-
-              <div className="create-goal-grid" aria-label="Create board goals">
-                {draftGoals.map((goal, index) => (
-                  <div className={`goal-input-cell ${index === FREE_SPACE_INDEX ? "is-free-space" : ""}`} key={`draft-${index}`}>
-                    <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
-                      {index + 1}
-                    </label>
-                    <input
-                      id={`goal-input-${index}`}
-                      className="goal-input"
-                      type="text"
-                      value={goal}
-                      onChange={(event) => updateDraftGoal(index, event.target.value)}
-                      placeholder={index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`}
-                      readOnly={index === FREE_SPACE_INDEX}
-                    />
-                  </div>
-                ))}
+                  return (
+                    <button
+                      key={stepLabel}
+                      className={`create-step-pill ${statusClass}`}
+                      type="button"
+                      onClick={() => goToCreateStep(stepNumber)}
+                    >
+                      <span className="sr-only">Step {stepNumber}: </span>
+                      {stepLabel}
+                    </button>
+                  );
+                })}
               </div>
 
-              <button className="btn btn-primary center-action-btn" type="submit">
-                Create Board
-              </button>
-            </form>
+              {createStep === 1 && (
+                <div className="create-step-panel">
+                  <label className="field-label" htmlFor="boardTitleInput">What is your board name?</label>
+                  <input
+                    id="boardTitleInput"
+                    name="boardTitle"
+                    className="field-input"
+                    type="text"
+                    required
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    placeholder="e.g., 2026 Fitness Goals"
+                  />
+                </div>
+              )}
+
+              {createStep === 2 && (
+                <div className="create-step-panel">
+                  <p className="create-help">Choose how you want to win your bingo game.</p>
+                  <div className="game-type-options" role="radiogroup" aria-label="Game type options">
+                    {GAME_TYPE_OPTIONS.map((option) => {
+                      const isSelected = draftGameType === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          className={`game-type-card ${isSelected ? "is-selected" : ""}`}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setDraftGameType(option.id)}
+                        >
+                          <strong>{option.title}</strong>
+                          <span>{option.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {createStep === 3 && (
+                <div className="create-step-panel">
+                  <p className="create-help">Add your goals to each tile. Center tile is always FREE SPACE.</p>
+
+                  <div className="create-goal-grid" aria-label="Create board goals">
+                    {draftGoals.map((goal, index) => (
+                      <div className={`goal-input-cell ${index === FREE_SPACE_INDEX ? "is-free-space" : ""}`} key={`draft-${index}`}>
+                        <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
+                          {index + 1}
+                        </label>
+                        <input
+                          id={`goal-input-${index}`}
+                          className="goal-input"
+                          type="text"
+                          value={goal}
+                          onChange={(event) => updateDraftGoal(index, event.target.value)}
+                          placeholder={index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`}
+                          readOnly={index === FREE_SPACE_INDEX}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {createStep === 4 && (
+                <div className="create-step-panel">
+                  <p className="create-help">Customize your board color and tile shape.</p>
+
+                  <div className="customize-group">
+                    <h3>Board Color</h3>
+                    <div className="color-options" role="radiogroup" aria-label="Board color options">
+                      {BOARD_COLOR_OPTIONS.map((color) => {
+                        const isSelected = draftBoardColor === color;
+                        return (
+                          <button
+                            key={color}
+                            className={`color-option ${isSelected ? "is-selected" : ""}`}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-label={`Board color ${color}`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setDraftBoardColor(color)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="customize-group">
+                    <h3>Tile Shape</h3>
+                    <div className="shape-options" role="radiogroup" aria-label="Tile shape options">
+                      {TILE_SHAPE_OPTIONS.map((shape) => {
+                        const isSelected = draftTileShape === shape.id;
+                        return (
+                          <button
+                            key={shape.id}
+                            className={`shape-option ${isSelected ? "is-selected" : ""}`}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => setDraftTileShape(shape.id)}
+                          >
+                            <span className={`shape-preview shape-${shape.id}`}></span>
+                            <span>{shape.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="preview-strip" aria-hidden="true" style={{ borderColor: draftBoardColor }}>
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <span key={`preview-${index}`} className={`preview-tile shape-${draftTileShape}`}></span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="create-actions">
+                <button
+                  className="btn btn-outline"
+                  type="button"
+                  onClick={() => goToCreateStep(createStep - 1)}
+                  disabled={createStep === 1}
+                >
+                  Back
+                </button>
+
+                {createStep < CREATE_STEPS.length ? (
+                  <button className="btn btn-accent" type="button" onClick={() => goToCreateStep(createStep + 1)}>
+                    Continue
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" type="button" onClick={createBoard}>
+                    Create Board
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         )}
 
@@ -727,28 +1135,45 @@ function DashboardPage({ user, setUser }) {
           <section className="view-panel" aria-labelledby="leaderboardTitle">
             <div className="panel-head">
               <h1 id="leaderboardTitle">Leaderboard</h1>
-              <p>Ranked by progress percentage across active boards.</p>
+              <p>Each group has its own leaderboard, ranked by average board progress.</p>
             </div>
 
-            <div className="leaderboard-shell">
-              <table className="leaderboard-table">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Name</th>
-                    <th>Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankings.map((entry, index) => (
-                    <tr key={entry.name} className={entry.isSelf ? "self" : ""}>
-                      <td>{index + 1}</td>
-                      <td>{entry.name}</td>
-                      <td>{entry.progress}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {groupLeaderboards.length === 0 && (
+              <div className="empty-state">
+                <h2>No groups yet</h2>
+                <p>Create or join a group in Profile to see group leaderboards.</p>
+              </div>
+            )}
+
+            <div className="group-leaderboard-list">
+              {groupLeaderboards.map((groupBoard) => (
+                <article className="leaderboard-shell group-leaderboard" key={groupBoard.id}>
+                  <div className="group-leaderboard-head">
+                    <h2>{groupBoard.name}</h2>
+                    <p>Group code: {groupBoard.code}</p>
+                  </div>
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Name</th>
+                        <th>Progress</th>
+                        <th>Boards</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupBoard.entries.map((entry, index) => (
+                        <tr key={`${groupBoard.id}-${entry.id}`} className={entry.isSelf ? "self" : ""}>
+                          <td>{index + 1}</td>
+                          <td>{entry.name}</td>
+                          <td>{entry.progress}%</td>
+                          <td>{entry.boardCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </article>
+              ))}
             </div>
           </section>
         )}
@@ -765,6 +1190,64 @@ function DashboardPage({ user, setUser }) {
               <p>Total boards: {boards.length}</p>
               <p>Average progress: {yourProgress}%</p>
             </div>
+
+            <section className="profile-groups" aria-label="Groups">
+              <h2>Your Groups</h2>
+
+              <form className="group-form" onSubmit={createGroup}>
+                <label className="field-label" htmlFor="newGroupNameInput">Create a Group</label>
+                <div className="group-form-row">
+                  <input
+                    id="newGroupNameInput"
+                    className="field-input"
+                    type="text"
+                    value={newGroupName}
+                    onChange={(event) => setNewGroupName(event.target.value)}
+                    placeholder="Group name"
+                  />
+                  <button className="btn btn-primary" type="submit">Create Group</button>
+                </div>
+              </form>
+
+              <form className="group-form" onSubmit={joinGroup}>
+                <label className="field-label" htmlFor="joinGroupCodeInput">Join a Group</label>
+                <div className="group-form-row">
+                  <input
+                    id="joinGroupCodeInput"
+                    className="field-input"
+                    type="text"
+                    value={joinCode}
+                    onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                    placeholder="Enter group code"
+                  />
+                  <button className="btn btn-outline" type="submit">Join</button>
+                </div>
+              </form>
+
+              <p className="group-notice" role="status">{groupNotice}</p>
+
+              {userGroups.length === 0 && (
+                <div className="empty-state">
+                  <h3>No groups joined</h3>
+                  <p>Create a group above or join one with a code.</p>
+                </div>
+              )}
+
+              <div className="group-list">
+                {userGroups.map((group) => (
+                  <article className="group-card" key={group.id}>
+                    <h3>{group.name}</h3>
+                    <p>
+                      Group code: <strong>{group.code}</strong>
+                    </p>
+                    <p>Members: {group.members.length}</p>
+                    <p>
+                      Role: {group.ownerId === user.id ? "Owner" : "Member"}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
           </section>
         )}
       </main>

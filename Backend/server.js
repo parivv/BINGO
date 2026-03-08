@@ -6,6 +6,7 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
+const { randomUUID } = require("crypto");
 
 function loadEnvFile() {
   const envPath = path.join(__dirname, ".env");
@@ -66,6 +67,9 @@ const supabase = require("./supabase");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FIXED_GOAL_COUNT = 25;
+const FREE_SPACE_INDEX = 12;
+const FREE_SPACE_TEXT = "FREE SPACE";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const FRONTEND_REDIRECT =
   process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
@@ -265,6 +269,360 @@ app.post("/auth/logout", (req, res, next) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend running" });
+});
+
+function requireAuth(req, res, next) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  return next();
+}
+
+function generateGroupCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i += 1) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
+async function createUniqueGroupCode() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const code = generateGroupCode();
+    const { data, error } = await supabase
+      .from("groups")
+      .select("id")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return code;
+  }
+
+  return `${Date.now().toString(36).slice(-6)}`.toUpperCase();
+}
+
+// GET groups for current user
+app.get("/api/groups", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(400).json({ error: "Authenticated user id missing." });
+
+  const { data: memberships, error: mErr } = await supabase
+    .from("group_members")
+    .select("group_id")
+    .eq("user_id", userId);
+
+  if (mErr) return res.status(500).json({ error: mErr.message });
+
+  const groupIds = (memberships || []).map((m) => m.group_id);
+  if (groupIds.length === 0) return res.json({ groups: [] });
+
+  const { data: groups, error: gErr } = await supabase
+    .from("groups")
+    .select("id, name, code, owner_user_id, created_at")
+    .in("id", groupIds);
+
+  if (gErr) return res.status(500).json({ error: gErr.message });
+
+  const { data: members, error: membersErr } = await supabase
+    .from("group_members")
+    .select("group_id, user_id, user_name")
+    .in("group_id", groupIds);
+
+  if (membersErr) return res.status(500).json({ error: membersErr.message });
+
+  const withMembers = (groups || []).map((group) => ({
+    ...group,
+    members: (members || [])
+      .filter((member) => member.group_id === group.id)
+      .map((member) => ({ id: member.user_id, name: member.user_name }))
+  }));
+
+  return res.json({ groups: withMembers });
+});
+
+// Create group
+app.post("/api/groups", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  const userName = req.user?.name || "Player";
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+
+  if (!userId) return res.status(400).json({ error: "Authenticated user id missing." });
+  if (!name) return res.status(400).json({ error: "Group name is required." });
+
+  try {
+    const code = await createUniqueGroupCode();
+
+    const { data: createdGroup, error: groupErr } = await supabase
+      .from("groups")
+      .insert({
+        name,
+        code,
+        owner_user_id: userId
+      })
+      .select("id, name, code, owner_user_id, created_at")
+      .single();
+
+    if (groupErr) return res.status(500).json({ error: groupErr.message });
+
+    const { error: memberErr } = await supabase
+      .from("group_members")
+      .insert({
+        group_id: createdGroup.id,
+        user_id: userId,
+        user_name: userName
+      });
+
+    if (memberErr) return res.status(500).json({ error: memberErr.message });
+
+    return res.status(201).json({
+      group: {
+        ...createdGroup,
+        members: [{ id: userId, name: userName }]
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Failed to create group." });
+  }
+});
+
+// Join by code
+app.post("/api/groups/join", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  const userName = req.user?.name || "Player";
+  const code = typeof req.body?.code === "string" ? req.body.code.trim().toUpperCase() : "";
+
+  if (!userId) return res.status(400).json({ error: "Authenticated user id missing." });
+  if (!code) return res.status(400).json({ error: "Group code is required." });
+
+  const { data: group, error: groupErr } = await supabase
+    .from("groups")
+    .select("id, name, code, owner_user_id, created_at")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (groupErr) return res.status(500).json({ error: groupErr.message });
+  if (!group) return res.status(404).json({ error: "Group code not found." });
+
+  const { data: existingMembership, error: existingErr } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", group.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingErr) return res.status(500).json({ error: existingErr.message });
+  if (existingMembership) return res.status(200).json({ group, alreadyMember: true });
+
+  const { error: joinErr } = await supabase
+    .from("group_members")
+    .insert({
+      group_id: group.id,
+      user_id: userId,
+      user_name: userName
+    });
+
+  if (joinErr) return res.status(500).json({ error: joinErr.message });
+
+  return res.json({ group, joined: true });
+});
+
+// Group leaderboard
+app.get("/api/groups/:groupId/leaderboard", requireAuth, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user?.id;
+  if (!userId) return res.status(400).json({ error: "Authenticated user id missing." });
+
+  const { data: membership, error: memErr } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (memErr) return res.status(500).json({ error: memErr.message });
+  if (!membership) return res.status(403).json({ error: "Not a member of this group." });
+
+  const { data: members, error: membersErr } = await supabase
+    .from("group_members")
+    .select("user_id, user_name")
+    .eq("group_id", groupId);
+
+  if (membersErr) return res.status(500).json({ error: membersErr.message });
+
+  const memberIds = (members || []).map((m) => m.user_id);
+
+  const { data: boards, error: boardsErr } = await supabase
+    .from("boards")
+    .select("user_id, total, completed")
+    .in("user_id", memberIds);
+
+  if (boardsErr) return res.status(500).json({ error: boardsErr.message });
+
+  const entries = (members || []).map((member) => {
+    const ownBoards = (boards || []).filter((b) => b.user_id === member.user_id);
+    const progress = ownBoards.length
+      ? Math.round(ownBoards.reduce((sum, b) => sum + Math.round((b.completed / b.total) * 100), 0) / ownBoards.length)
+      : 0;
+
+    return {
+      id: member.user_id,
+      name: member.user_name,
+      progress,
+      boardCount: ownBoards.length,
+      isSelf: member.user_id === userId
+    };
+  }).sort((a, b) => b.progress - a.progress);
+
+  return res.json({ entries });
+});
+
+function normalizeGoals(rawGoals) {
+  const source = Array.isArray(rawGoals) ? rawGoals : [];
+
+  return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => {
+    const rawGoal = source[index];
+    const defaultText = index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`;
+
+    if (!rawGoal || typeof rawGoal !== "object") {
+      return {
+        id: randomUUID(),
+        text: defaultText,
+        completed: false
+      };
+    }
+
+    const text =
+      index === FREE_SPACE_INDEX
+        ? FREE_SPACE_TEXT
+        : typeof rawGoal.text === "string" && rawGoal.text.trim()
+          ? rawGoal.text.trim()
+          : defaultText;
+
+    return {
+      id: rawGoal.id || randomUUID(),
+      text,
+      completed: Boolean(rawGoal.completed)
+    };
+  });
+}
+
+function normalizeBoardPayload(body) {
+  const title = typeof body?.title === "string" ? body.title.trim() : "";
+  if (!title) {
+    return { error: "Board title is required." };
+  }
+
+  const goals = normalizeGoals(body?.goals);
+  const completed = goals.filter((goal) => goal.completed).length;
+
+  return {
+    data: {
+      title,
+      goals,
+      total: FIXED_GOAL_COUNT,
+      completed
+    }
+  };
+}
+
+app.get("/api/boards", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data, error } = await supabase
+    .from("boards")
+    .select("id, title, total, completed, goals, created_at, updated_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: `Failed to fetch boards: ${error.message}` });
+  }
+
+  return res.json({ boards: data || [] });
+});
+
+app.post("/api/boards", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const normalized = normalizeBoardPayload(req.body);
+  if (normalized.error) {
+    return res.status(400).json({ error: normalized.error });
+  }
+
+  const { data, error } = await supabase
+    .from("boards")
+    .insert({
+      user_id: userId,
+      ...normalized.data
+    })
+    .select("id, title, total, completed, goals, created_at, updated_at")
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: `Failed to create board: ${error.message}` });
+  }
+
+  return res.status(201).json({ board: data });
+});
+
+app.put("/api/boards/:boardId", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { boardId } = req.params;
+  const normalized = normalizeBoardPayload(req.body);
+  if (normalized.error) {
+    return res.status(400).json({ error: normalized.error });
+  }
+
+  const { data, error } = await supabase
+    .from("boards")
+    .update(normalized.data)
+    .eq("id", boardId)
+    .eq("user_id", userId)
+    .select("id, title, total, completed, goals, created_at, updated_at")
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: `Failed to update board: ${error.message}` });
+  }
+
+  if (!data) {
+    return res.status(404).json({ error: "Board not found." });
+  }
+
+  return res.json({ board: data });
+});
+
+app.delete("/api/boards/:boardId", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { boardId } = req.params;
+  const { error } = await supabase
+    .from("boards")
+    .delete()
+    .eq("id", boardId)
+    .eq("user_id", userId);
+
+  if (error) {
+    return res.status(500).json({ error: `Failed to delete board: ${error.message}` });
+  }
+
+  return res.json({ success: true });
 });
 
 app.post("/api/contact", (req, res) => {
