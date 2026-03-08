@@ -272,9 +272,9 @@ p {
 
 .landing-main {
   display: grid;
-  gap: 1.35rem;
+  gap: 5rem;
   grid-template-columns: 1fr;
-  margin: 1.5rem auto 2rem;
+  margin: 3.5rem auto 2rem;
   max-width: 980px;
   padding: 0 clamp(1rem, 4vw, 2.5rem);
 }
@@ -349,12 +349,13 @@ p {
 
 .feature-card {
   background: rgba(244, 249, 233, 0.72);
-  border: 1px solid #342020;
   border-radius: 18px;
-  box-shadow: 0 8px 18px rgba(52, 32, 32, 0.15);
+  box-shadow: 0 12px 32px rgba(52, 32, 32, 0.25);
   display: grid;
   gap: 0.52rem;
-  padding: 0.95rem;
+  padding: 1.8rem;
+  min-height: 360px;
+  justify-content: flex-start;
 }
 
 .feature-icon {
@@ -365,6 +366,8 @@ p {
 
 .feature-card h3 {
   font-size: 1.22rem;
+  max-width: 14ch;
+  line-height: 1.2;
 }
 
 .feature-card p {
@@ -379,7 +382,7 @@ p {
   display: grid;
   gap: 0.65rem;
   justify-items: center;
-  padding: 1.3rem 1rem 1.5rem;
+  padding: 2.5rem 1.5rem;
   text-align: center;
 }
 
