@@ -6,19 +6,25 @@ import trophyIcon from "../Trophy_Icon.png";
 import friendsIcon from "../Friends_Icon.png";
 import volcaneSVG from "../Volcano_SVG.svg";
 import footerVolcanoGif from "../Final Volcano.gif";
+import pariHeadshot from "../Pari_Headshot.jpg";
+import joyceHeadshot from "../Joyce_Headshot.jpg";
+import hadiyaHeadshot from "../Hadiya_Headshot.jpg";
+import colinHeadshot from "../Colin_Headshot.jpg";
 
 const STORAGE_KEYS = {
-  user: "bingo-battles.user"
+  user: "bingo-battles.user",
+  boardOrderPrefix: "bingo-battles.board-order"
 };
 
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
-const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:5000";
+const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:8000";
 const API_ORIGIN = OAUTH_BACKEND_ORIGIN;
 const APP_BASE = import.meta.env.BASE_URL || "/";
 const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BASE;
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
+const TRACKED_GOAL_COUNT = FIXED_GOAL_COUNT - 1;
 const CREATE_STEPS = ["Board Name", "Game Type", "Add Goals", "Customize"];
 const GAME_TYPE_OPTIONS = [
   {
@@ -39,17 +45,101 @@ const TILE_SHAPE_OPTIONS = [
   { id: "circle", label: "Circle" }
 ];
 
+function hexToRgb(hexColor) {
+  if (typeof hexColor !== "string") {
+    return null;
+  }
+
+  const cleaned = hexColor.trim().replace(/^#/, "");
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(cleaned)) {
+    return null;
+  }
+
+  const normalized = cleaned.length === 3
+    ? cleaned.split("").map((character) => `${character}${character}`).join("")
+    : cleaned;
+
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16)
+  };
+}
+
+function lightenHex(hexColor, ratio = 0.3) {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) {
+    return hexColor;
+  }
+
+  const amount = Math.min(1, Math.max(0, ratio));
+  const tintChannel = (channel) => Math.round(channel + (255 - channel) * amount);
+  return `rgb(${tintChannel(rgb.r)}, ${tintChannel(rgb.g)}, ${tintChannel(rgb.b)})`;
+}
+
+function areAllTilesComplete(goals, indices) {
+  return indices.every((index) => Boolean(goals[index]?.completed));
+}
+
+function hasFiveInARow(goals) {
+  if (!Array.isArray(goals) || goals.length < FIXED_GOAL_COUNT) {
+    return false;
+  }
+
+  for (let row = 0; row < 5; row += 1) {
+    const rowIndices = Array.from({ length: 5 }, (_, offset) => row * 5 + offset);
+    if (areAllTilesComplete(goals, rowIndices)) {
+      return true;
+    }
+  }
+
+  for (let column = 0; column < 5; column += 1) {
+    const columnIndices = Array.from({ length: 5 }, (_, offset) => column + offset * 5);
+    if (areAllTilesComplete(goals, columnIndices)) {
+      return true;
+    }
+  }
+
+  const leftToRightDiagonal = [0, 6, 12, 18, 24];
+  const rightToLeftDiagonal = [4, 8, 12, 16, 20];
+  return areAllTilesComplete(goals, leftToRightDiagonal) || areAllTilesComplete(goals, rightToLeftDiagonal);
+}
+
+function hasBoardBeenBeaten(board) {
+  if (!board || !Array.isArray(board.goals) || board.goals.length < FIXED_GOAL_COUNT) {
+    return false;
+  }
+
+  return board.gameType === "blackout"
+    ? board.goals.every((goal) => Boolean(goal.completed))
+    : hasFiveInARow(board.goals);
+}
+
+function getWinMessage(board) {
+  if (board?.gameType === "blackout") {
+    return "Blackout complete. Every tile is checked off.";
+  }
+
+  return "You achieved 5 goals in a row. Yippee!";
+}
+
 function createDraftGoals() {
   return Array.from({ length: FIXED_GOAL_COUNT }, (_, index) =>
     index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : ""
   );
 }
 
+function createDraftTallies() {
+  return Array.from({ length: FIXED_GOAL_COUNT }, () => "");
+}
+
 function createDefaultGoal(index, completed = false) {
   return {
     id: crypto.randomUUID(),
     text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`,
-    completed
+    completed: index === FREE_SPACE_INDEX ? true : completed,
+    tallyTarget: null,
+    tallyProgress: 0
   };
 }
 
@@ -70,14 +160,31 @@ function normalizeBoard(rawBoard) {
     const text = index === FREE_SPACE_INDEX
       ? FREE_SPACE_TEXT
       : (typeof rawGoal.text === "string" && rawGoal.text.trim() ? rawGoal.text.trim() : `Goal ${index + 1}`);
+
+    const rawTarget = Number.parseInt(rawGoal.tallyTarget ?? rawGoal.tally_target ?? "", 10);
+    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+
+    const rawProgress = Number.parseInt(rawGoal.tallyProgress ?? rawGoal.tally_progress ?? "", 10);
+    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0
+      ? (tallyTarget ? Math.min(rawProgress, tallyTarget) : rawProgress)
+      : 0;
+
+    const completed = index === FREE_SPACE_INDEX
+      ? true
+      : tallyTarget
+        ? tallyProgress >= tallyTarget
+        : Boolean(rawGoal.completed);
+
     return {
       id: rawGoal.id || crypto.randomUUID(),
       text,
-      completed: Boolean(rawGoal.completed)
+      completed,
+      tallyTarget,
+      tallyProgress: tallyTarget ? tallyProgress : 0
     };
   });
 
-  const completed = normalizedGoals.filter((goal) => goal.completed).length;
+  const completed = normalizedGoals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length;
 
   return {
     id: rawBoard.id || crypto.randomUUID(),
@@ -85,9 +192,9 @@ function normalizeBoard(rawBoard) {
     total: FIXED_GOAL_COUNT,
     completed,
     goals: normalizedGoals,
-    gameType: rawBoard.gameType || "five-in-a-row",
-    boardColor: rawBoard.boardColor || "#c10b3c",
-    tileShape: rawBoard.tileShape || "rounded"
+    gameType: rawBoard.gameType || rawBoard.game_type || "five-in-a-row",
+    boardColor: rawBoard.boardColor || rawBoard.board_color || "#c10b3c",
+    tileShape: rawBoard.tileShape || rawBoard.tile_shape || rawBoard.shape || "rounded"
   };
 }
 
@@ -112,6 +219,10 @@ function resolveDisplayName(name, email) {
   return username || "Player";
 }
 
+function hasEmailDomain(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 function normalizeUser(rawUser) {
   if (!rawUser || typeof rawUser !== "object") {
     return null;
@@ -130,13 +241,79 @@ function normalizeUser(rawUser) {
   };
 }
 
+function calculateBestFiveInARowProgress(goals) {
+  if (!Array.isArray(goals) || goals.length !== FIXED_GOAL_COUNT) {
+    return 20; // Start at 20% (free space)
+  }
+
+  // Define all possible winning lines (rows, columns, diagonals)
+  const rows = [
+    [0, 1, 2, 3, 4],
+    [5, 6, 7, 8, 9],
+    [10, 11, 12, 13, 14],
+    [15, 16, 17, 18, 19],
+    [20, 21, 22, 23, 24]
+  ];
+
+  const columns = [
+    [0, 5, 10, 15, 20],
+    [1, 6, 11, 16, 21],
+    [2, 7, 12, 17, 22],
+    [3, 8, 13, 18, 23],
+    [4, 9, 14, 19, 24]
+  ];
+
+  const diagonals = [
+    [0, 6, 12, 18, 24],
+    [4, 8, 12, 16, 20]
+  ];
+
+  const allLines = [...rows, ...columns, ...diagonals];
+
+  // Find the line with the highest completion percentage
+  let maxProgress = 0;
+  for (const line of allLines) {
+    const completedCount = line.filter(index => goals[index] && goals[index].completed).length;
+    const lineProgress = (completedCount / 5) * 100;
+    maxProgress = Math.max(maxProgress, lineProgress);
+  }
+
+  return Math.round(maxProgress);
+}
+
 function calculateProgressFromBoards(boards) {
   if (!Array.isArray(boards) || boards.length === 0) {
     return 0;
   }
 
   return Math.round(
-    boards.reduce((sum, board) => sum + Math.round((board.completed / board.total) * 100), 0) / boards.length
+    boards.reduce((sum, board) => {
+      let boardProgress = 0;
+      const gameType = board.gameType || "five-in-a-row";
+      
+      if (gameType === "five-in-a-row") {
+        // For 5-in-a-row, find the best possible line completion
+        if (Array.isArray(board.goals)) {
+          boardProgress = calculateBestFiveInARowProgress(board.goals);
+        } else {
+          boardProgress = 20; // Start at 20% (free space)
+        }
+      } else if (gameType === "blackout") {
+        // For blackout, progress is based on completing all 24 tiles
+        const completed = Array.isArray(board.goals)
+          ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+          : board.completed;
+        boardProgress = (completed / TRACKED_GOAL_COUNT) * 100;
+      } else {
+        // Fallback
+        const completed = Array.isArray(board.goals)
+          ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+          : board.completed;
+        boardProgress = (completed / TRACKED_GOAL_COUNT) * 100;
+      }
+      
+      return sum + Math.round(boardProgress);
+    }, 0) / boards.length
   );
 }
 
@@ -211,13 +388,22 @@ async function fetchBoardsApi() {
   return boards.map(normalizeBoard).filter(Boolean);
 }
 
-async function createBoardApi(title, goals) {
+async function createBoardApi(boardDraft) {
   const payload = await apiRequest("/api/boards", {
     method: "POST",
-    body: JSON.stringify({ title, goals })
+    body: JSON.stringify(boardDraft)
   });
 
   return normalizeBoard(payload.board);
+}
+
+async function suggestGoalsApi(input) {
+  const payload = await apiRequest("/api/goals/suggest", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+
+  return Array.isArray(payload.suggestions) ? payload.suggestions : [];
 }
 
 async function updateBoardApi(board) {
@@ -225,11 +411,29 @@ async function updateBoardApi(board) {
     method: "PUT",
     body: JSON.stringify({
       title: board.title,
-      goals: board.goals
+      goals: board.goals,
+      gameType: board.gameType,
+      boardColor: board.boardColor,
+      tileShape: board.tileShape
     })
   });
 
   return normalizeBoard(payload.board);
+}
+
+async function deleteBoardApi(boardId) {
+  await apiRequest(`/api/boards/${boardId}`, {
+    method: "DELETE"
+  });
+}
+
+async function updateUsernameApi(name) {
+  const payload = await apiRequest("/api/profile/username", {
+    method: "PUT",
+    body: JSON.stringify({ name })
+  });
+
+  return normalizeUser(payload.user);
 }
 
 async function fetchGroupsApi() {
@@ -245,6 +449,12 @@ async function createGroupApi(name) {
   });
 
   return normalizeGroup(payload.group);
+}
+
+async function deleteGroupApi(groupId) {
+  await apiRequest(`/api/groups/${groupId}`, {
+    method: "DELETE"
+  });
 }
 
 async function joinGroupApi(code) {
@@ -263,6 +473,11 @@ async function joinGroupApi(code) {
 async function fetchGroupLeaderboardApi(groupId) {
   const payload = await apiRequest(`/api/groups/${groupId}/leaderboard`, { method: "GET" });
   return Array.isArray(payload.entries) ? payload.entries : [];
+}
+
+async function fetchGroupMemberBoardsApi(groupId, memberId) {
+  const payload = await apiRequest(`/api/groups/${groupId}/members/${memberId}/boards`, { method: "GET" });
+  return Array.isArray(payload.boards) ? payload.boards : [];
 }
 
 async function assignGroupBoardApi(groupId, boardId) {
@@ -285,6 +500,54 @@ function readUser() {
   } catch (_error) {
     return null;
   }
+}
+
+function getBoardOrderStorageKey(userId) {
+  return `${STORAGE_KEYS.boardOrderPrefix}.${userId}`;
+}
+
+function readBoardOrder(userId) {
+  if (!userId) {
+    return [];
+  }
+
+  const raw = localStorage.getItem(getBoardOrderStorageKey(userId));
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function sortBoardsBySavedOrder(boards, savedOrder) {
+  if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(savedOrder) || savedOrder.length === 0) {
+    return boards;
+  }
+
+  const orderMap = new Map(savedOrder.map((id, index) => [id, index]));
+  return [...boards].sort((left, right) => {
+    const leftIndex = orderMap.get(left.id);
+    const rightIndex = orderMap.get(right.id);
+
+    if (leftIndex === undefined && rightIndex === undefined) {
+      return 0;
+    }
+
+    if (leftIndex === undefined) {
+      return 1;
+    }
+
+    if (rightIndex === undefined) {
+      return -1;
+    }
+
+    return leftIndex - rightIndex;
+  });
 }
 
 function AmbientBackground() {
@@ -338,7 +601,7 @@ function LandingPage({ user }) {
           <div className="landing-hero-copy">
             <h1 id="hero-title">Turn Your Goals Into An Explosive Challenge</h1>
             <p className="hero-copy">
-              Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt.
+              Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt!
             </p>
             <button className="btn btn-accent btn-lg" type="button" onClick={() => navigate("/signup")}>
               Start Your Battle
@@ -367,11 +630,40 @@ function LandingPage({ user }) {
           </article>
         </section>
 
+        <section className="landing-team" aria-label="Our Team">
+          <h2>Our Team</h2>
+          <div className="team-grid">
+            <a href="https://www.linkedin.com/in/pari-vyas/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={pariHeadshot} alt="Pari Vyas" className="team-headshot" />
+              <h3>Pari Vyas</h3>
+              <span className="team-role-pill">Backend Developer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/joyce-maniquis-aa79b531b/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={joyceHeadshot} alt="Joyce Maniquis" className="team-headshot" />
+              <h3>Joyce Maniquis</h3>
+              <span className="team-role-pill">Frontend Developer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/hadiya-stewart-aab467352/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={hadiyaHeadshot} alt="Hadiya Stewart" className="team-headshot" />
+              <h3>Hadiya Stewart</h3>
+              <span className="team-role-pill">UI Designer</span>
+            </a>
+
+            <a href="https://www.linkedin.com/in/colin-mendoza/" target="_blank" rel="noopener noreferrer" className="team-card">
+              <img src={colinHeadshot} alt="Colin Mendoza" className="team-headshot" />
+              <h3>Colin Mendoza</h3>
+              <span className="team-role-pill">UX Designer</span>
+            </a>
+          </div>
+        </section>
+
         <section className="landing-cta" aria-labelledby="cta-title">
           <h2 id="cta-title">Ready to Erupt?</h2>
           <p>Use Bingo Battles to transform your goals into reality.</p>
-          <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
-            Start Your Battle
+          <button className="btn btn-accent btn-lg" type="button" onClick={() => navigate("/signup")}>
+            Create Your First Board
           </button>
         </section>
       </main>
@@ -403,6 +695,11 @@ function AuthPage({ setUser, mode, user }) {
     if (isSignup) {
       if (!trimmedEmail || !trimmedUsername || !password) {
         setError("Email, username, and password are required.");
+        return;
+      }
+
+      if (!hasEmailDomain(trimmedEmail)) {
+        setError("Please enter a valid email with a domain (for example, name@example.com).");
         return;
       }
     } else if (!trimmedIdentifier || !password) {
@@ -453,7 +750,7 @@ function AuthPage({ setUser, mode, user }) {
       setUser(nextUser);
       navigate("/dashboard");
     } catch (_error) {
-      const target = API_ORIGIN || "Vite proxy -> http://localhost:5000";
+      const target = API_ORIGIN || "Vite proxy -> http://localhost:8000";
       setError(`Cannot reach backend via ${target}. Make sure backend is running.`);
     }
   }
@@ -561,16 +858,18 @@ function AuthPage({ setUser, mode, user }) {
             Continue with Google
           </button>
 
-          <a
-            className="text-link"
-            href="#"
-            onClick={(event) => {
-              event.preventDefault();
-              window.alert("Password reset is coming soon.");
-            }}
-          >
-            Forgot password?
-          </a>
+          {!isSignup && (
+            <a
+              className="text-link"
+              href="#"
+              onClick={(event) => {
+                event.preventDefault();
+                window.alert("Password reset is coming soon.");
+              }}
+            >
+              Forgot password?
+            </a>
+          )}
 
           <p className="auth-switch">
             {isSignup ? "Already have an account? " : "Need an account? "}
@@ -582,6 +881,7 @@ function AuthPage({ setUser, mode, user }) {
           <p className="auth-error" role="alert" hidden={!error}>
             {error}
           </p>
+
         </section>
       </main>
 
@@ -598,6 +898,11 @@ function DashboardPage({ user, setUser }) {
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
   const [draftGameType, setDraftGameType] = useState("five-in-a-row");
   const [draftGoals, setDraftGoals] = useState(() => createDraftGoals());
+  const [draftTallies, setDraftTallies] = useState(() => createDraftTallies());
+  const [goalSuggestionTheme, setGoalSuggestionTheme] = useState("health, learning, and productivity");
+  const [goalSuggestionTone, setGoalSuggestionTone] = useState("practical");
+  const [goalSuggestionDifficulty, setGoalSuggestionDifficulty] = useState("mixed");
+  const [isSuggestingGoals, setIsSuggestingGoals] = useState(false);
   const [groups, setGroups] = useState([]);
   const [groupLeaderboards, setGroupLeaderboards] = useState([]);
   const [newGroupName, setNewGroupName] = useState("");
@@ -606,6 +911,14 @@ function DashboardPage({ user, setUser }) {
   const [assignmentDraftByGroup, setAssignmentDraftByGroup] = useState({});
   const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
   const [draftTileShape, setDraftTileShape] = useState("rounded");
+  const [deletingBoardId, setDeletingBoardId] = useState(null);
+  const [deletePopupBoard, setDeletePopupBoard] = useState(null);
+  const [deletingGroupId, setDeletingGroupId] = useState(null);
+  const [deletePopupGroup, setDeletePopupGroup] = useState(null);
+  const [memberBoardsPopup, setMemberBoardsPopup] = useState(null);
+  const [winPopup, setWinPopup] = useState(null);
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [draggedBoardId, setDraggedBoardId] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -614,7 +927,8 @@ function DashboardPage({ user, setUser }) {
       try {
         const apiBoards = await fetchBoardsApi();
         if (isMounted) {
-          setBoards(apiBoards);
+          const savedOrder = readBoardOrder(user.id);
+          setBoards(sortBoardsBySavedOrder(apiBoards, savedOrder));
         }
       } catch (error) {
         if (isMounted) {
@@ -629,6 +943,11 @@ function DashboardPage({ user, setUser }) {
       isMounted = false;
     };
   }, [user.id]);
+
+  useEffect(() => {
+    const orderedIds = boards.map((board) => board.id);
+    localStorage.setItem(getBoardOrderStorageKey(user.id), JSON.stringify(orderedIds));
+  }, [boards, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -718,8 +1037,25 @@ function DashboardPage({ user, setUser }) {
     setDraftTitle("My 2026 Goals");
     setDraftGameType("five-in-a-row");
     setDraftGoals(createDraftGoals());
+    setDraftTallies(createDraftTallies());
+    setGoalSuggestionTheme("health, learning, and productivity");
+    setGoalSuggestionTone("practical");
+    setGoalSuggestionDifficulty("mixed");
     setDraftBoardColor("#c10b3c");
     setDraftTileShape("rounded");
+  }
+
+  function updateDraftTally(index, value) {
+    setDraftTallies((previous) => {
+      const next = [...previous];
+      if (index === FREE_SPACE_INDEX) {
+        next[index] = "";
+        return next;
+      }
+
+      next[index] = value.replace(/[^0-9]/g, "").slice(0, 2);
+      return next;
+    });
   }
 
   function goToCreateStep(nextStep) {
@@ -745,11 +1081,26 @@ function DashboardPage({ user, setUser }) {
     const goals = draftGoals.map((goalText, index) => ({
       id: crypto.randomUUID(),
       text: index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : (goalText.trim() || `Goal ${index + 1}`),
-      completed: false
+      completed: index === FREE_SPACE_INDEX,
+      tallyTarget: (() => {
+        if (index === FREE_SPACE_INDEX) {
+          return null;
+        }
+
+        const parsed = Number.parseInt(draftTallies[index] || "", 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      })(),
+      tallyProgress: 0
     }));
 
     try {
-      const created = await createBoardApi(title.trim(), goals);
+      const created = await createBoardApi({
+        title: title.trim(),
+        goals,
+        gameType: draftGameType,
+        boardColor: draftBoardColor,
+        tileShape: draftTileShape
+      });
       if (created) {
         setBoards((previous) => [
           {
@@ -769,6 +1120,85 @@ function DashboardPage({ user, setUser }) {
 
     resetCreateDraft();
     setActiveTab("dashboard");
+  }
+
+  async function generateGoalSuggestions(mode = "all") {
+    if (isSuggestingGoals) {
+      return;
+    }
+
+    const allTargetIndexes = Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => index)
+      .filter((index) => index !== FREE_SPACE_INDEX);
+
+    const targetIndexes = mode === "empty"
+      ? allTargetIndexes.filter((index) => {
+        const currentText = typeof draftGoals[index] === "string" ? draftGoals[index].trim() : "";
+        return !currentText;
+      })
+      : allTargetIndexes;
+
+    if (targetIndexes.length === 0) {
+      setGroupNotice("No empty goal tiles to fill.");
+      return;
+    }
+
+    setIsSuggestingGoals(true);
+    setGroupNotice("");
+
+    try {
+      const existingGoals = mode === "empty"
+        ? allTargetIndexes
+            .map((index) => (typeof draftGoals[index] === "string" ? draftGoals[index].trim() : ""))
+            .filter(Boolean)
+        : [];
+
+      const suggestions = await suggestGoalsApi({
+        theme: goalSuggestionTheme,
+        tone: goalSuggestionTone,
+        difficulty: goalSuggestionDifficulty,
+        count: targetIndexes.length,
+        existingGoals
+      });
+
+      if (suggestions.length === 0) {
+        setGroupNotice("AI did not return suggestions. Try adjusting the theme.");
+        return;
+      }
+
+      let insertedCount = 0;
+      setDraftGoals((previous) => {
+        const next = [...previous];
+
+        targetIndexes.forEach((index, suggestionOffset) => {
+          const suggestion = suggestions[suggestionOffset];
+          if (!suggestion) {
+            return;
+          }
+
+          next[index] = suggestion;
+          insertedCount += 1;
+        });
+
+        return next;
+      });
+
+      if (insertedCount === 0) {
+        setGroupNotice("AI returned output, but no usable goals were found. Try a different theme.");
+        return;
+      }
+
+      const actionLabel = mode === "empty" ? "Filled" : "Added";
+      const shortfall = targetIndexes.length - insertedCount;
+      if (shortfall > 0) {
+        setGroupNotice(`${actionLabel} ${insertedCount} AI goal suggestion${insertedCount === 1 ? "" : "s"}. ${shortfall} tile${shortfall === 1 ? "" : "s"} still need text.`);
+      } else {
+        setGroupNotice(`${actionLabel} ${insertedCount} AI goal suggestion${insertedCount === 1 ? "" : "s"}.`);
+      }
+    } catch (error) {
+      setGroupNotice(error.message || "Could not generate AI goal suggestions.");
+    } finally {
+      setIsSuggestingGoals(false);
+    }
   }
 
   async function createGroup(event) {
@@ -815,6 +1245,49 @@ function DashboardPage({ user, setUser }) {
     }
   }
 
+  function requestDeleteGroup(group) {
+    if (!group?.id) {
+      return;
+    }
+
+    setDeletePopupGroup({ id: group.id, name: group.name || "Untitled Group" });
+  }
+
+  function closeDeleteGroupPopup() {
+    if (deletingGroupId) {
+      return;
+    }
+
+    setDeletePopupGroup(null);
+  }
+
+  async function confirmDeleteGroup() {
+    const groupId = deletePopupGroup?.id;
+    if (!groupId) {
+      return;
+    }
+
+    setDeletingGroupId(groupId);
+    setGroupNotice("");
+
+    try {
+      await deleteGroupApi(groupId);
+      setGroups((previous) => previous.filter((group) => group.id !== groupId));
+      setGroupLeaderboards((previous) => previous.filter((group) => group.id !== groupId));
+      setAssignmentDraftByGroup((previous) => {
+        const next = { ...previous };
+        delete next[groupId];
+        return next;
+      });
+      setDeletePopupGroup(null);
+      setGroupNotice("Group deleted.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not delete group.");
+    } finally {
+      setDeletingGroupId(null);
+    }
+  }
+
   async function assignBoardToGroup(groupId) {
     const selectedBoardId = assignmentDraftByGroup[groupId] || null;
 
@@ -825,6 +1298,49 @@ function DashboardPage({ user, setUser }) {
       setGroupNotice(selectedBoardId ? "Assigned board to group leaderboard." : "Cleared assigned board for this group.");
     } catch (error) {
       setGroupNotice(error.message || "Could not assign board to group.");
+    }
+  }
+
+  function closeMemberBoardsPopup() {
+    setMemberBoardsPopup(null);
+  }
+
+  async function openMemberBoardsPopup(groupBoard, entry) {
+    if (!groupBoard?.id || !entry?.id) {
+      return;
+    }
+
+    setMemberBoardsPopup({
+      groupId: groupBoard.id,
+      groupName: groupBoard.name,
+      memberId: entry.id,
+      memberName: entry.name,
+      boards: [],
+      loading: true,
+      error: ""
+    });
+
+    try {
+      const boardsForMember = await fetchGroupMemberBoardsApi(groupBoard.id, entry.id);
+      setMemberBoardsPopup({
+        groupId: groupBoard.id,
+        groupName: groupBoard.name,
+        memberId: entry.id,
+        memberName: entry.name,
+        boards: boardsForMember,
+        loading: false,
+        error: ""
+      });
+    } catch (error) {
+      setMemberBoardsPopup({
+        groupId: groupBoard.id,
+        groupName: groupBoard.name,
+        memberId: entry.id,
+        memberName: entry.name,
+        boards: [],
+        loading: false,
+        error: error.message || "Could not load member boards."
+      });
     }
   }
 
@@ -839,10 +1355,26 @@ function DashboardPage({ user, setUser }) {
       return;
     }
 
+    const targetGoal = Array.isArray(currentBoard.goals)
+      ? currentBoard.goals.find((goal) => goal.id === goalId)
+      : null;
+    if (targetGoal?.text === FREE_SPACE_TEXT) {
+      return;
+    }
+
     const goals = Array.isArray(currentBoard.goals)
       ? currentBoard.goals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, completed: !goal.completed }
+        goal.id === goalId && goal.text !== FREE_SPACE_TEXT
+          ? goal.tallyTarget
+            ? (() => {
+              const nextProgress = goal.tallyProgress >= goal.tallyTarget ? 0 : goal.tallyProgress + 1;
+              return {
+                ...goal,
+                tallyProgress: nextProgress,
+                completed: nextProgress >= goal.tallyTarget
+              };
+            })()
+            : { ...goal, completed: !goal.completed }
           : goal
       )
       : [];
@@ -850,19 +1382,68 @@ function DashboardPage({ user, setUser }) {
     const optimisticBoard = {
       ...currentBoard,
       goals,
-      completed: goals.filter((goal) => goal.completed).length
+      completed: goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
     };
+
+    const wasBeaten = hasBoardBeenBeaten(currentBoard);
+    const isNowBeaten = hasBoardBeenBeaten(optimisticBoard);
 
     setBoards((previous) => previous.map((board) => (board.id === boardId ? optimisticBoard : board)));
 
     try {
       const updated = await updateBoardApi(optimisticBoard);
+      const persistedBoard = updated || optimisticBoard;
       if (updated) {
         setBoards((previous) => previous.map((board) => (board.id === boardId ? updated : board)));
+      }
+
+      if (!wasBeaten && isNowBeaten) {
+        setWinPopup({
+          boardId,
+          title: persistedBoard.title || "Board Complete",
+          message: getWinMessage(persistedBoard)
+        });
       }
     } catch (_error) {
       setBoards((previous) => previous.map((board) => (board.id === boardId ? currentBoard : board)));
       setGroupNotice("Could not save goal progress.");
+    }
+  }
+
+  function requestDeleteBoard(board) {
+    if (!board?.id) {
+      return;
+    }
+
+    setDeletePopupBoard({ id: board.id, title: board.title || "Untitled Board" });
+  }
+
+  function closeDeletePopup() {
+    if (deletingBoardId) {
+      return;
+    }
+
+    setDeletePopupBoard(null);
+  }
+
+  async function confirmDeleteBoard() {
+    const boardId = deletePopupBoard?.id;
+    if (!boardId) {
+      return;
+    }
+
+    setDeletingBoardId(boardId);
+    setGroupNotice("");
+
+    try {
+      await deleteBoardApi(boardId);
+      setBoards((previous) => previous.filter((board) => board.id !== boardId));
+      setDeletePopupBoard(null);
+      setGroupNotice("Board deleted.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not delete board.");
+    } finally {
+      setDeletingBoardId(null);
     }
   }
 
@@ -879,6 +1460,81 @@ function DashboardPage({ user, setUser }) {
     localStorage.removeItem(STORAGE_KEYS.user);
     setUser(null);
     navigate("/");
+  }
+
+  function handleBoardDragStart(boardId) {
+    setDraggedBoardId(boardId);
+  }
+
+  function handleBoardDragEnd() {
+    setDraggedBoardId(null);
+  }
+
+  function handleBoardDrop(targetBoardId) {
+    if (!draggedBoardId || draggedBoardId === targetBoardId) {
+      setDraggedBoardId(null);
+      return;
+    }
+
+    setBoards((previous) => {
+      const sourceIndex = previous.findIndex((board) => board.id === draggedBoardId);
+      const targetIndex = previous.findIndex((board) => board.id === targetBoardId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return previous;
+      }
+
+      const reordered = [...previous];
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      return reordered;
+    });
+
+    setDraggedBoardId(null);
+  }
+
+  async function editUsername() {
+    if (isUpdatingUsername) {
+      return;
+    }
+
+    const inputName = window.prompt("Enter your new username:", user.name || "");
+    if (inputName === null) {
+      return;
+    }
+
+    const trimmedName = inputName.trim();
+    if (!trimmedName) {
+      setGroupNotice("Username cannot be empty.");
+      return;
+    }
+
+    if (trimmedName === user.name) {
+      return;
+    }
+
+    try {
+      setIsUpdatingUsername(true);
+      const updatedUser = await updateUsernameApi(trimmedName);
+      if (!updatedUser) {
+        throw new Error("Could not update username.");
+      }
+
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setGroups((previous) =>
+        previous.map((group) => ({
+          ...group,
+          members: group.members.map((member) =>
+            member.id === updatedUser.id ? { ...member, name: updatedUser.name } : member
+          )
+        }))
+      );
+      setGroupNotice("Username updated.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not update username.");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
   }
 
   return (
@@ -952,33 +1608,91 @@ function DashboardPage({ user, setUser }) {
 
             <div className="board-grid" aria-live="polite">
               {boards.map((board) => {
-                const completionPercent = Math.round((board.completed / board.total) * 100);
+                const completedGoals = Array.isArray(board.goals)
+                  ? board.goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length
+                  : board.completed;
+                
+                let completionPercent = 0;
+                const gameType = board.gameType || "five-in-a-row";
+                if (gameType === "five-in-a-row") {
+                  // For 5-in-a-row, find the best possible line completion
+                  if (Array.isArray(board.goals)) {
+                    completionPercent = calculateBestFiveInARowProgress(board.goals);
+                  } else {
+                    completionPercent = 20; // Start at 20% (free space)
+                  }
+                } else if (gameType === "blackout") {
+                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                } else {
+                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                }
+                
+                const boardColor = board.boardColor || "#c10b3c";
+                const tileShape = board.tileShape || "rounded";
+                const gameTypeLabel = board.gameType === "blackout" ? "Blackout" : "5-in-a-Row";
+                const completedTileBackground = lightenHex(boardColor, 0.38);
+                const completedTileBorder = lightenHex(boardColor, 0.24);
                 return (
-                  <article className="board-card" key={board.id}>
-                    <h3>{board.title}</h3>
+                  <article
+                    className={`board-card ${draggedBoardId === board.id ? "is-dragging" : ""}`}
+                    key={board.id}
+                    draggable
+                    onDragStart={() => handleBoardDragStart(board.id)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => handleBoardDrop(board.id)}
+                    onDragEnd={handleBoardDragEnd}
+                    style={{
+                      backgroundColor: boardColor,
+                      borderColor: boardColor,
+                      color: "#f4f9e9"
+                    }}
+                  >
+                    <div className="board-card-head">
+                      <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
+                      <span className="board-game-type" aria-label={`Game type: ${gameTypeLabel}`}>{gameTypeLabel}</span>
+                    </div>
                     <div className="progress-row">
                       <span>
-                        {board.completed} of {board.total} goals complete
+                        {completedGoals} of {TRACKED_GOAL_COUNT} goals complete
                       </span>
                       <strong>{completionPercent}%</strong>
                     </div>
-                    <div className="progress-track" aria-hidden="true">
-                      <div className="progress-fill" style={{ width: `${completionPercent}%` }}></div>
+                    <div className="progress-track" aria-hidden="true" style={{ backgroundColor: "rgba(244, 249, 233, 0.32)" }}>
+                      <div className="progress-fill" style={{ width: `${completionPercent}%`, backgroundColor: "#f4f9e9" }}></div>
                     </div>
 
                     <div className="bingo-grid" aria-label={`${board.title} goals`}>
                       {board.goals.map((goal, index) => (
                         <button
                           key={goal.id}
-                          className={`bingo-cell ${goal.completed ? "is-done" : ""}`}
+                          className={`bingo-cell shape-${tileShape} ${goal.completed ? "is-done" : ""}`}
                           type="button"
+                          style={{
+                            borderColor: boardColor,
+                            ...(goal.completed
+                              ? {
+                                "--done-bg": completedTileBackground,
+                                "--done-border": completedTileBorder
+                              }
+                              : {})
+                          }}
                           onClick={() => toggleGoal(board.id, goal.id)}
                         >
-                          <span className="bingo-cell-index">{index + 1}</span>
+                          {goal.tallyTarget ? (
+                            <span className="bingo-tally">{goal.tallyProgress}/{goal.tallyTarget}</span>
+                          ) : null}
                           <span>{goal.text}</span>
                         </button>
                       ))}
                     </div>
+                    <button
+                      className="btn btn-outline board-delete-btn"
+                      type="button"
+                      onClick={() => requestDeleteBoard(board)}
+                      disabled={deletingBoardId === board.id}
+                    >
+                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
+                    </button>
                   </article>
                 );
               })}
@@ -991,6 +1705,7 @@ function DashboardPage({ user, setUser }) {
             <div className="panel-head">
               <h1 id="createTitle">Create a New Board</h1>
               <p>Follow each step to build your board setup.</p>
+              <p className="group-notice" role="status" hidden={!groupNotice}>{groupNotice}</p>
             </div>
 
             <div className="create-board-form create-wizard">
@@ -1056,22 +1771,85 @@ function DashboardPage({ user, setUser }) {
 
               {createStep === 3 && (
                 <div className="create-step-panel">
-                  <p className="create-help">Add your goals to each tile. Center tile is always FREE SPACE.</p>
+                  <p className="create-help">Add your goals to each square. The small blank in the top-right of each tile is an optional tally target. The center tile is always a FREE SPACE.</p>
+
+                  <div className="goal-ai-controls" aria-label="AI goal suggestion controls">
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={goalSuggestionTheme}
+                      onChange={(event) => setGoalSuggestionTheme(event.target.value)}
+                      placeholder="Theme for suggestions"
+                      maxLength={80}
+                    />
+
+                    <select
+                      className="field-input"
+                      value={goalSuggestionTone}
+                      onChange={(event) => setGoalSuggestionTone(event.target.value)}
+                    >
+                      <option value="practical">Practical</option>
+                      <option value="ambitious">Ambitious</option>
+                      <option value="fun">Fun</option>
+                    </select>
+
+                    <select
+                      className="field-input"
+                      value={goalSuggestionDifficulty}
+                      onChange={(event) => setGoalSuggestionDifficulty(event.target.value)}
+                    >
+                      <option value="easy">Easy</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="hard">Hard</option>
+                    </select>
+
+                    <div className="goal-ai-actions">
+                      <button
+                        className="btn btn-accent"
+                        type="button"
+                        onClick={() => generateGoalSuggestions("all")}
+                        disabled={isSuggestingGoals}
+                      >
+                        {isSuggestingGoals ? "Generating..." : "Generate with AI"}
+                      </button>
+
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        onClick={() => generateGoalSuggestions("empty")}
+                        disabled={isSuggestingGoals}
+                      >
+                        Fill Empty Only
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="create-goal-grid" aria-label="Create board goals">
                     {draftGoals.map((goal, index) => (
                       <div className={`goal-input-cell ${index === FREE_SPACE_INDEX ? "is-free-space" : ""}`} key={`draft-${index}`}>
-                        <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
-                          {index + 1}
-                        </label>
-                        <input
+                        <div className="goal-input-toprow">
+                          <label className="goal-input-index" htmlFor={`goal-input-${index}`}>
+                            {index + 1}
+                          </label>
+                          <input
+                            id={`goal-tally-${index}`}
+                            className="goal-tally-input"
+                            type="text"
+                            inputMode="numeric"
+                            value={draftTallies[index]}
+                            onChange={(event) => updateDraftTally(index, event.target.value)}
+                            readOnly={index === FREE_SPACE_INDEX}
+                            aria-label={index === FREE_SPACE_INDEX ? "Free space" : `Optional tally target for goal ${index + 1}`}
+                          />
+                        </div>
+                        <textarea
                           id={`goal-input-${index}`}
                           className="goal-input"
-                          type="text"
                           value={goal}
                           onChange={(event) => updateDraftGoal(index, event.target.value)}
                           placeholder={index === FREE_SPACE_INDEX ? FREE_SPACE_TEXT : `Goal ${index + 1}`}
                           readOnly={index === FREE_SPACE_INDEX}
+                          rows={3}
                         />
                       </div>
                     ))}
@@ -1126,7 +1904,7 @@ function DashboardPage({ user, setUser }) {
                     </div>
                   </div>
 
-                  <div className="preview-strip" aria-hidden="true" style={{ borderColor: draftBoardColor }}>
+                  <div className="preview-strip" aria-hidden="true" style={{ borderColor: draftBoardColor, backgroundColor: draftBoardColor }}>
                     {Array.from({ length: 5 }).map((_, index) => (
                       <span key={`preview-${index}`} className={`preview-tile shape-${draftTileShape}`}></span>
                     ))}
@@ -1134,15 +1912,16 @@ function DashboardPage({ user, setUser }) {
                 </div>
               )}
 
-              <div className="create-actions">
-                <button
-                  className="btn btn-outline"
-                  type="button"
-                  onClick={() => goToCreateStep(createStep - 1)}
-                  disabled={createStep === 1}
-                >
-                  Back
-                </button>
+              <div className={`create-actions ${createStep === 1 ? "is-first-step" : ""}`}>
+                {createStep > 1 && (
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() => goToCreateStep(createStep - 1)}
+                  >
+                    Back
+                  </button>
+                )}
 
                 {createStep < CREATE_STEPS.length ? (
                   <button className="btn btn-accent" type="button" onClick={() => goToCreateStep(createStep + 1)}>
@@ -1192,7 +1971,15 @@ function DashboardPage({ user, setUser }) {
                       {groupBoard.entries.map((entry, index) => (
                         <tr key={`${groupBoard.id}-${entry.id}`} className={entry.isSelf ? "self" : ""}>
                           <td>{index + 1}</td>
-                          <td>{entry.name}</td>
+                          <td>
+                            <button
+                              className="leaderboard-name-btn"
+                              type="button"
+                              onClick={() => openMemberBoardsPopup(groupBoard, entry)}
+                            >
+                              {entry.name}
+                            </button>
+                          </td>
                           <td>{entry.assignedBoardTitle || "Not assigned"}</td>
                           <td>{entry.progress}%</td>
                         </tr>
@@ -1213,7 +2000,12 @@ function DashboardPage({ user, setUser }) {
             </div>
 
             <div className="empty-state">
-              <h2>{user.name}</h2>
+              <div className="profile-name-row">
+                <h2>{user.name}</h2>
+                <button className="btn btn-outline" type="button" onClick={editUsername} disabled={isUpdatingUsername}>
+                  {isUpdatingUsername ? "Saving..." : "Edit Username"}
+                </button>
+              </div>
               <p>Total boards: {boards.length}</p>
               <p>Average progress: {yourProgress}%</p>
             </div>
@@ -1313,6 +2105,17 @@ function DashboardPage({ user, setUser }) {
                     <p>
                       Current assignment: <strong>{getBoardTitle(assignedBoardId)}</strong>
                     </p>
+
+                    {group.ownerId === user.id && (
+                      <button
+                        className="btn btn-outline group-delete-btn"
+                        type="button"
+                        onClick={() => requestDeleteGroup(group)}
+                        disabled={deletingGroupId === group.id}
+                      >
+                        {deletingGroupId === group.id ? "Deleting..." : "Delete Group"}
+                      </button>
+                    )}
                         </>
                       );
                     })()}
@@ -1323,6 +2126,188 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
       </main>
+
+      {deletePopupBoard && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeDeletePopup}>
+          <section
+            className="win-popup confirm-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deletePopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="deletePopupTitle">Delete Board?</h2>
+            <p className="win-popup-board">{deletePopupBoard.title}</p>
+            <p>This action permanently deletes the board from your dashboard and Supabase.</p>
+            <div className="confirm-popup-actions">
+              <button className="btn btn-ghost" type="button" onClick={closeDeletePopup} disabled={Boolean(deletingBoardId)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmDeleteBoard} disabled={Boolean(deletingBoardId)}>
+                {deletingBoardId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deletePopupGroup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeDeleteGroupPopup}>
+          <section
+            className="win-popup confirm-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deleteGroupPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="deleteGroupPopupTitle">Delete Group?</h2>
+            <p className="win-popup-board">{deletePopupGroup.name}</p>
+            <p>This permanently deletes the group and removes all memberships from Supabase.</p>
+            <div className="confirm-popup-actions">
+              <button className="btn btn-ghost" type="button" onClick={closeDeleteGroupPopup} disabled={Boolean(deletingGroupId)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmDeleteGroup} disabled={Boolean(deletingGroupId)}>
+                {deletingGroupId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {memberBoardsPopup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeMemberBoardsPopup}>
+          <section
+            className="win-popup member-boards-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="memberBoardsPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="memberBoardsPopupTitle">{memberBoardsPopup.memberName}'s Assigned Board</h2>
+            <p>Group: {memberBoardsPopup.groupName}</p>
+
+            {memberBoardsPopup.loading && <p>Loading boards...</p>}
+
+            {!memberBoardsPopup.loading && memberBoardsPopup.error && (
+              <p className="group-notice">{memberBoardsPopup.error}</p>
+            )}
+
+            {!memberBoardsPopup.loading && !memberBoardsPopup.error && memberBoardsPopup.boards.length === 0 && (
+              <p>No assigned board for this user in this group.</p>
+            )}
+
+            {!memberBoardsPopup.loading && !memberBoardsPopup.error && memberBoardsPopup.boards.length > 0 && (
+              <div className="member-board-list">
+                {memberBoardsPopup.boards.map((board) => {
+                  const total = Number.isFinite(board.total) ? board.total : FIXED_GOAL_COUNT;
+                  const tracked = Math.max(1, total - 1);
+                  const completed = Number.isFinite(board.completed) ? Math.max(0, board.completed) : 0;
+                  const percent = Math.max(0, Math.min(100, Math.round((completed / tracked) * 100)));
+                  const boardType = board.game_type === "blackout" ? "Blackout" : "5-in-a-Row";
+                  const boardColor = typeof board.board_color === "string" && board.board_color.trim()
+                    ? board.board_color
+                    : "#c10b3c";
+                  const tileShape = board.shape || "rounded";
+                  const completedTileBackground = lightenHex(boardColor, 0.38);
+                  const completedTileBorder = lightenHex(boardColor, 0.24);
+                  const rawGoals = Array.isArray(board.goals) ? board.goals : [];
+                  const displayGoals = Array.from({ length: FIXED_GOAL_COUNT }, (_, index) => {
+                    const goal = rawGoals[index];
+                    const goalText = typeof goal?.text === "string" && goal.text.trim()
+                      ? goal.text.trim()
+                      : index === FREE_SPACE_INDEX
+                        ? FREE_SPACE_TEXT
+                        : `Goal ${index + 1}`;
+                    const rawTarget = Number.parseInt(goal?.tallyTarget ?? goal?.tally_target ?? "", 10);
+                    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+                    const rawProgress = Number.parseInt(goal?.tallyProgress ?? goal?.tally_progress ?? "", 10);
+                    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0 ? rawProgress : 0;
+
+                    return {
+                      text: goalText,
+                      completed: index === FREE_SPACE_INDEX ? true : Boolean(goal?.completed),
+                      tallyTarget,
+                      tallyProgress: tallyTarget ? Math.min(tallyProgress, tallyTarget) : 0
+                    };
+                  });
+
+                  return (
+                    <article
+                      className="board-card member-board-card"
+                      key={board.id}
+                      style={{
+                        backgroundColor: boardColor,
+                        borderColor: boardColor,
+                        color: "#f4f9e9"
+                      }}
+                    >
+                      <div className="board-card-head">
+                        <h3 style={{ color: "#f4f9e9" }}>{board.title || "Untitled Board"}</h3>
+                        <span className="board-game-type" aria-label={`Game type: ${boardType}`}>{boardType}</span>
+                      </div>
+                      <div className="progress-row">
+                        <span>
+                          {completed} of {tracked} goals complete
+                        </span>
+                        <strong>{percent}%</strong>
+                      </div>
+                      <div className="progress-track" aria-hidden="true" style={{ backgroundColor: "rgba(244, 249, 233, 0.32)" }}>
+                        <div className="progress-fill" style={{ width: `${percent}%`, backgroundColor: "#f4f9e9" }}></div>
+                      </div>
+
+                      <div className="bingo-grid" aria-label="Assigned board preview">
+                        {displayGoals.map((goal, index) => (
+                          <div
+                            key={`${board.id}-tile-${index}`}
+                            className={`bingo-cell member-readonly-cell shape-${tileShape} ${goal.completed ? "is-done" : ""}`}
+                            style={{
+                              borderColor: boardColor,
+                              ...(goal.completed
+                                ? {
+                                  "--done-bg": completedTileBackground,
+                                  "--done-border": completedTileBorder
+                                }
+                                : {})
+                            }}
+                          >
+                            {goal.tallyTarget ? (
+                              <span className="bingo-tally">{goal.tallyProgress}/{goal.tallyTarget}</span>
+                            ) : null}
+                            <span>{goal.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            <button className="btn btn-primary" type="button" onClick={closeMemberBoardsPopup}>Close</button>
+          </section>
+        </div>
+      )}
+
+      {winPopup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={() => setWinPopup(null)}>
+          <section
+            className="win-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="winPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="winPopupTitle">Board Beat!</h2>
+            <p className="win-popup-board">{winPopup.title}</p>
+            <p>{winPopup.message}</p>
+            <img className="win-popup-gif" src={footerVolcanoGif} alt="Erupting volcano celebration" />
+            <button className="btn btn-primary" type="button" onClick={() => setWinPopup(null)}>
+              Awesome
+            </button>
+          </section>
+        </div>
+      )}
 
       <AppFooter />
     </>

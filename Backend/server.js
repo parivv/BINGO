@@ -3,6 +3,7 @@ const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
@@ -66,11 +67,27 @@ loadEnvFile();
 const supabase = require("./supabase");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 const FIXED_GOAL_COUNT = 25;
 const FREE_SPACE_INDEX = 12;
 const FREE_SPACE_TEXT = "FREE SPACE";
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const MAX_AI_SUGGESTIONS = FIXED_GOAL_COUNT - 1;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const geminiClient = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
+const ALLOWED_GAME_TYPES = new Set(["five-in-a-row", "blackout"]);
+const ALLOWED_TILE_SHAPES = new Set(["rounded", "square", "circle"]);
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return "#c10b3c";
+  }
+
+  const trimmed = value.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : "#c10b3c";
+}
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
 const FRONTEND_REDIRECT =
   process.env.FRONTEND_REDIRECT || `${FRONTEND_ORIGIN}/dashboard`;
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
@@ -279,6 +296,61 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+app.put("/api/profile/username", requireAuth, async (req, res) => {
+  const userId = req.user?.id;
+  const nextName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  if (!nextName) {
+    return res.status(400).json({ error: "Username is required." });
+  }
+
+  const { data: existingUser, error: existingErr } = await supabase
+    .from("users")
+    .select("id")
+    .eq("name", nextName)
+    .maybeSingle();
+
+  if (existingErr) {
+    return res.status(500).json({ error: existingErr.message });
+  }
+
+  if (existingUser && existingUser.id !== userId) {
+    return res.status(400).json({ error: "Username already in use" });
+  }
+
+  const { data: updatedUser, error: updateErr } = await supabase
+    .from("users")
+    .update({ name: nextName })
+    .eq("id", userId)
+    .select("*")
+    .single();
+
+  if (updateErr || !updatedUser) {
+    return res.status(500).json({ error: updateErr?.message || "Could not update username." });
+  }
+
+  const { error: groupMemberErr } = await supabase
+    .from("group_members")
+    .update({ user_name: nextName })
+    .eq("user_id", userId);
+
+  if (groupMemberErr) {
+    return res.status(500).json({ error: groupMemberErr.message });
+  }
+
+  req.login(updatedUser, (loginErr) => {
+    if (loginErr) {
+      return res.status(500).json({ error: "Could not refresh session user." });
+    }
+
+    return res.json({ user: updatedUser });
+  });
+});
+
 function generateGroupCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -435,6 +507,53 @@ app.post("/api/groups/join", requireAuth, async (req, res) => {
   return res.json({ group, joined: true });
 });
 
+app.delete("/api/groups/:groupId", requireAuth, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: group, error: groupError } = await supabase
+    .from("groups")
+    .select("id, owner_user_id")
+    .eq("id", groupId)
+    .maybeSingle();
+
+  if (groupError) {
+    return res.status(500).json({ error: groupError.message });
+  }
+
+  if (!group) {
+    return res.status(404).json({ error: "Group not found." });
+  }
+
+  if (group.owner_user_id !== userId) {
+    return res.status(403).json({ error: "Only the group owner can delete this group." });
+  }
+
+  const { error: memberDeleteError } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId);
+
+  if (memberDeleteError) {
+    return res.status(500).json({ error: memberDeleteError.message });
+  }
+
+  const { error: groupDeleteError } = await supabase
+    .from("groups")
+    .delete()
+    .eq("id", groupId);
+
+  if (groupDeleteError) {
+    return res.status(500).json({ error: groupDeleteError.message });
+  }
+
+  return res.json({ success: true, groupId });
+});
+
 app.put("/api/groups/:groupId/assignment", requireAuth, async (req, res) => {
   const { groupId } = req.params;
   const userId = req.user?.id;
@@ -540,6 +659,62 @@ app.get("/api/groups/:groupId/leaderboard", requireAuth, async (req, res) => {
   return res.json({ entries });
 });
 
+app.get("/api/groups/:groupId/members/:memberId/boards", requireAuth, async (req, res) => {
+  const { groupId, memberId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: requesterMembership, error: requesterMembershipError } = await supabase
+    .from("group_members")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (requesterMembershipError) {
+    return res.status(500).json({ error: requesterMembershipError.message });
+  }
+
+  if (!requesterMembership) {
+    return res.status(403).json({ error: "Not a member of this group." });
+  }
+
+  const { data: targetMembership, error: targetMembershipError } = await supabase
+    .from("group_members")
+    .select("id, assigned_board_id")
+    .eq("group_id", groupId)
+    .eq("user_id", memberId)
+    .maybeSingle();
+
+  if (targetMembershipError) {
+    return res.status(500).json({ error: targetMembershipError.message });
+  }
+
+  if (!targetMembership) {
+    return res.status(404).json({ error: "User is not a member of this group." });
+  }
+
+  if (!targetMembership.assigned_board_id) {
+    return res.json({ boards: [] });
+  }
+
+  const { data: assignedBoard, error: boardsError } = await supabase
+    .from("boards")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
+    .eq("id", targetMembership.assigned_board_id)
+    .eq("user_id", memberId)
+    .maybeSingle();
+
+  if (boardsError) {
+    return res.status(500).json({ error: boardsError.message });
+  }
+
+  return res.json({ boards: assignedBoard ? [assignedBoard] : [] });
+});
+
 function normalizeGoals(rawGoals) {
   const source = Array.isArray(rawGoals) ? rawGoals : [];
 
@@ -551,7 +726,9 @@ function normalizeGoals(rawGoals) {
       return {
         id: randomUUID(),
         text: defaultText,
-        completed: false
+        completed: index === FREE_SPACE_INDEX,
+        tallyTarget: null,
+        tallyProgress: 0
       };
     }
 
@@ -562,10 +739,24 @@ function normalizeGoals(rawGoals) {
           ? rawGoal.text.trim()
           : defaultText;
 
+    const rawTarget = Number.parseInt(rawGoal.tallyTarget ?? rawGoal.tally_target ?? "", 10);
+    const tallyTarget = Number.isFinite(rawTarget) && rawTarget > 0 ? rawTarget : null;
+
+    const rawProgress = Number.parseInt(rawGoal.tallyProgress ?? rawGoal.tally_progress ?? "", 10);
+    const tallyProgress = Number.isFinite(rawProgress) && rawProgress > 0
+      ? (tallyTarget ? Math.min(rawProgress, tallyTarget) : rawProgress)
+      : 0;
+
     return {
       id: rawGoal.id || randomUUID(),
       text,
-      completed: Boolean(rawGoal.completed)
+      completed: index === FREE_SPACE_INDEX
+        ? true
+        : tallyTarget
+          ? tallyProgress >= tallyTarget
+          : Boolean(rawGoal.completed),
+      tallyTarget,
+      tallyProgress: tallyTarget ? tallyProgress : 0
     };
   });
 }
@@ -577,17 +768,137 @@ function normalizeBoardPayload(body) {
   }
 
   const goals = normalizeGoals(body?.goals);
-  const completed = goals.filter((goal) => goal.completed).length;
+  const completed = goals.filter((goal, index) => index !== FREE_SPACE_INDEX && goal.completed).length;
+  const gameType = ALLOWED_GAME_TYPES.has(body?.gameType) ? body.gameType : "five-in-a-row";
+  const tileShape = ALLOWED_TILE_SHAPES.has(body?.tileShape) ? body.tileShape : "rounded";
+  const boardColor = normalizeHexColor(body?.boardColor);
 
   return {
     data: {
       title,
       goals,
       total: FIXED_GOAL_COUNT,
-      completed
+      completed,
+      game_type: gameType,
+      board_color: boardColor,
+      shape: tileShape
     }
   };
 }
+
+function parseJsonArrayFromModelText(text) {
+  const asText = typeof text === "string" ? text : "";
+  const cleaned = asText.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  const firstBracket = cleaned.indexOf("[");
+  const lastBracket = cleaned.lastIndexOf("]");
+  if (firstBracket < 0 || lastBracket <= firstBracket) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cleaned.slice(firstBracket, lastBracket + 1));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function parseSuggestionLinesFromModelText(text) {
+  const rawText = typeof text === "string" ? text : "";
+  return rawText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*\d.)]+\s*/, "").trim())
+    .map((line) => line.replace(/^"|"$/g, ""))
+    .filter(Boolean);
+}
+
+function normalizeSuggestionText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 55);
+}
+
+app.post("/api/goals/suggest", requireAuth, async (req, res) => {
+  if (!geminiClient) {
+    return res.status(503).json({
+      error: "Gemini is not configured. Set GEMINI_API_KEY in Backend/.env."
+    });
+  }
+
+  const theme = typeof req.body?.theme === "string" ? req.body.theme.trim() : "personal growth";
+  const tone = typeof req.body?.tone === "string" ? req.body.tone.trim() : "practical";
+  const difficulty = typeof req.body?.difficulty === "string" ? req.body.difficulty.trim() : "mixed";
+  const countInput = Number.parseInt(req.body?.count, 10);
+  const count = Number.isFinite(countInput)
+    ? Math.max(1, Math.min(MAX_AI_SUGGESTIONS, countInput))
+    : MAX_AI_SUGGESTIONS;
+
+  const existingGoals = Array.isArray(req.body?.existingGoals)
+    ? req.body.existingGoals
+        .map(normalizeSuggestionText)
+        .filter(Boolean)
+        .slice(0, MAX_AI_SUGGESTIONS)
+    : [];
+
+  const safeTheme = theme.slice(0, 80) || "personal growth";
+  const safeTone = tone.slice(0, 40) || "practical";
+  const safeDifficulty = difficulty.slice(0, 40) || "mixed";
+
+  const prompt = [
+    `Generate ${count} unique bingo goal ideas.`,
+    `Theme: ${safeTheme}`,
+    `Tone: ${safeTone}`,
+    `Difficulty: ${safeDifficulty}`,
+    `Goals to avoid repeating: ${JSON.stringify(existingGoals)}`,
+    "Rules:",
+    "- Return ONLY valid JSON array of strings.",
+    "- Each goal must be short (max 55 characters).",
+    "- Action-oriented and specific.",
+    "- Keep content safe and non-harmful."
+  ].join("\n");
+
+  try {
+    const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
+    const result = await model.generateContent(prompt);
+    const rawText = result?.response?.text ? result.response.text() : "";
+    const parsed = parseJsonArrayFromModelText(rawText);
+    const candidateItems = Array.isArray(parsed)
+      ? parsed
+      : parseSuggestionLinesFromModelText(rawText);
+
+    if (!Array.isArray(candidateItems) || candidateItems.length === 0) {
+      return res.status(502).json({ error: "Gemini response did not include usable suggestions." });
+    }
+
+    const existingSet = new Set(existingGoals.map((goal) => goal.toLowerCase()));
+    const seen = new Set();
+    const suggestions = [];
+
+    for (const item of candidateItems) {
+      const text = normalizeSuggestionText(item);
+      const lowered = text.toLowerCase();
+      if (!text || existingSet.has(lowered) || seen.has(lowered) || text === FREE_SPACE_TEXT) {
+        continue;
+      }
+
+      seen.add(lowered);
+      suggestions.push(text);
+      if (suggestions.length >= count) {
+        break;
+      }
+    }
+
+    return res.json({ suggestions });
+  } catch (error) {
+    return res.status(500).json({
+      error: error?.message || "Failed to generate AI goal suggestions."
+    });
+  }
+});
 
 app.get("/api/boards", requireAuth, async (req, res) => {
   const userId = req.user?.id;
@@ -597,7 +908,7 @@ app.get("/api/boards", requireAuth, async (req, res) => {
 
   const { data, error } = await supabase
     .from("boards")
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -625,7 +936,7 @@ app.post("/api/boards", requireAuth, async (req, res) => {
       user_id: userId,
       ...normalized.data
     })
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .single();
 
   if (error) {
@@ -652,7 +963,7 @@ app.put("/api/boards/:boardId", requireAuth, async (req, res) => {
     .update(normalized.data)
     .eq("id", boardId)
     .eq("user_id", userId)
-    .select("id, title, total, completed, goals, created_at, updated_at")
+    .select("id, title, total, completed, goals, game_type, board_color, shape, created_at, updated_at")
     .single();
 
   if (error) {
@@ -702,9 +1013,13 @@ app.post('/auth/signup', async (req, res) => {
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   const usernameCandidate = typeof username === 'string' && username.trim() ? username : name;
   const normalizedUsername = typeof usernameCandidate === 'string' ? usernameCandidate.trim() : '';
+  const hasEmailDomain = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 
   if (!normalizedEmail || !normalizedUsername || !password)
     return res.status(400).json({ error: 'All fields required' });
+
+  if (!hasEmailDomain)
+    return res.status(400).json({ error: 'Please enter a valid email with a domain' });
 
   const { data: existingEmailUser } = await supabase
     .from('users').select('*').eq('email', normalizedEmail).maybeSingle();
