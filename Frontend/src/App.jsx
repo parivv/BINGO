@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import CreatePageRoute from "./pages/CreatePageRoute";
+import LeaderboardPageRoute from "./pages/LeaderboardPageRoute";
+import ProfilePageRoute from "./pages/ProfilePageRoute";
 import volcanoLogo from "../Volcano Logo resized.png";
 import gridIcon from "../Grid_Icon.png";
 import trophyIcon from "../Trophy_Icon.png";
@@ -44,6 +47,12 @@ const TILE_SHAPE_OPTIONS = [
   { id: "square", label: "Square" },
   { id: "circle", label: "Circle" }
 ];
+const DASHBOARD_TAB_ROUTES = {
+  dashboard: "/dashboard",
+  create: "/dashboard/create",
+  leaderboard: "/dashboard/leaderboard",
+  profile: "/dashboard/profile"
+};
 
 function hexToRgb(hexColor) {
   if (typeof hexColor !== "string") {
@@ -890,9 +899,9 @@ function AuthPage({ setUser, mode, user }) {
   );
 }
 
-function DashboardPage({ user, setUser }) {
+function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [boards, setBoards] = useState([]);
   const [createStep, setCreateStep] = useState(1);
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
@@ -925,6 +934,15 @@ function DashboardPage({ user, setUser }) {
   const [editingBoardColor, setEditingBoardColor] = useState("#c10b3c");
   const [editingTileShape, setEditingTileShape] = useState("rounded");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  function goToTab(tabName) {
+    setActiveTab(tabName);
+    navigate(DASHBOARD_TAB_ROUTES[tabName] || DASHBOARD_TAB_ROUTES.dashboard);
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -1125,7 +1143,7 @@ function DashboardPage({ user, setUser }) {
     }
 
     resetCreateDraft();
-    setActiveTab("dashboard");
+    goToTab("dashboard");
   }
 
   async function generateGoalSuggestions(mode = "all") {
@@ -1622,7 +1640,7 @@ function DashboardPage({ user, setUser }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar dashboard-topbar">
-        <Link className="brand" to="/dashboard" onClick={() => setActiveTab("dashboard")}>
+        <Link className="brand" to="/dashboard" onClick={() => goToTab("dashboard")}>
           <img className="brand-logo-img" src={volcanoLogo} alt="" aria-hidden="true" />
           <span>Bingo Battles</span>
         </Link>
@@ -1631,28 +1649,28 @@ function DashboardPage({ user, setUser }) {
           <button
             className={`nav-link ${activeTab === "dashboard" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("dashboard")}
+            onClick={() => goToTab("dashboard")}
           >
             Dashboard
           </button>
           <button
             className={`nav-link ${activeTab === "create" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("create")}
+            onClick={() => goToTab("create")}
           >
             Create
           </button>
           <button
             className={`nav-link ${activeTab === "leaderboard" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("leaderboard")}
+            onClick={() => goToTab("leaderboard")}
           >
             Leaderboard
           </button>
           <button
             className={`nav-link ${activeTab === "profile" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("profile")}
+            onClick={() => goToTab("profile")}
           >
             Profile
           </button>
@@ -1679,7 +1697,7 @@ function DashboardPage({ user, setUser }) {
                   type="button"
                   onClick={() => {
                     resetCreateDraft();
-                    setActiveTab("create");
+                    goToTab("create");
                   }}
                 >
                   Create a Board
@@ -2524,7 +2542,7 @@ function DashboardPage({ user, setUser }) {
   );
 }
 
-function DashboardGate({ user, setUser }) {
+function DashboardGate({ user, setUser, initialTab = "dashboard" }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -2602,7 +2620,7 @@ function DashboardGate({ user, setUser }) {
     return <Navigate to="/" replace />;
   }
 
-  return <DashboardPage user={user} setUser={setUser} />;
+  return <DashboardPage user={user} setUser={setUser} initialTab={initialTab} />;
 }
 
 function AuthLegacyRedirect() {
@@ -2622,7 +2640,10 @@ export default function App() {
       <Route path="/auth" element={<AuthLegacyRedirect />} />
       <Route path="/login" element={<AuthPage setUser={setUser} mode="login" user={user} />} />
       <Route path="/signup" element={<AuthPage setUser={setUser} mode="signup" user={user} />} />
-      <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} />} />
+      <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} initialTab="dashboard" />} />
+      <Route path="/dashboard/create" element={<CreatePageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
+      <Route path="/dashboard/leaderboard" element={<LeaderboardPageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
+      <Route path="/dashboard/profile" element={<ProfilePageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
