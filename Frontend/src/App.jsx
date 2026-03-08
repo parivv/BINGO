@@ -149,19 +149,16 @@ function LandingPage({ user }) {
 
         <section className="feature-grid landing-feature-grid" aria-label="Key features">
           <article className="feature-card">
-            <span className="feature-chip">IG</span>
             <h3>Custom BINGO Boards</h3>
             <p>Create personalized Bingo boards with your unique goals and challenges.</p>
           </article>
 
           <article className="feature-card">
-            <span className="feature-chip">LB</span>
             <h3>Competitive Leaderboard</h3>
             <p>See how you stack up against friends and climb to the top.</p>
           </article>
 
           <article className="feature-card">
-            <span className="feature-chip">FR</span>
             <h3>Battle With Friends</h3>
             <p>Join groups, share your boards, and motivate each other to reach goals together.</p>
           </article>
@@ -169,7 +166,7 @@ function LandingPage({ user }) {
 
         <section className="landing-cta" aria-labelledby="cta-title">
           <h2 id="cta-title">Ready to Erupt?</h2>
-          <p>Join thousands of goal-getters turning dreams into achievements.</p>
+          <p>Use Bingo Battles to transform your goals into reality.</p>
           <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
             Start Your Battle
           </button>

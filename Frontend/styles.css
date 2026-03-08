@@ -1,5 +1,5 @@
 @import url("https://fonts.cdnfonts.com/css/volcanic-dungeon");
-@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Righteous&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&display=swap");
 
 @font-face {
   font-family: "CF Band of Brothers";
@@ -299,7 +299,6 @@ p {
 }
 
 .landing-hero h1 {
-  font-family: "Righteous", "Luckiest Guy", "Bungee", Impact, sans-serif;
   font-size: clamp(1.75rem, 4.1vw, 3.2rem);
   line-height: 0.97;
   max-width: 9ch;
@@ -325,19 +324,6 @@ p {
   display: grid;
   gap: 0.52rem;
   padding: 0.95rem;
-}
-
-.feature-chip {
-  align-items: center;
-  background: #c10b3c;
-  border-radius: 10px;
-  color: #f4f9e9;
-  display: inline-flex;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  height: 34px;
-  justify-content: center;
-  width: 34px;
 }
 
 .feature-card h3 {
