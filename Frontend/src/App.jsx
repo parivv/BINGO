@@ -359,6 +359,12 @@ async function updateBoardApi(board) {
   return normalizeBoard(payload.board);
 }
 
+async function deleteBoardApi(boardId) {
+  await apiRequest(`/api/boards/${boardId}`, {
+    method: "DELETE"
+  });
+}
+
 async function fetchGroupsApi() {
   const payload = await apiRequest("/api/groups", { method: "GET" });
   const groups = Array.isArray(payload.groups) ? payload.groups : [];
@@ -775,6 +781,8 @@ function DashboardPage({ user, setUser }) {
   const [assignmentDraftByGroup, setAssignmentDraftByGroup] = useState({});
   const [draftBoardColor, setDraftBoardColor] = useState("#c10b3c");
   const [draftTileShape, setDraftTileShape] = useState("rounded");
+  const [deletingBoardId, setDeletingBoardId] = useState(null);
+  const [deletePopupBoard, setDeletePopupBoard] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
 
   useEffect(() => {
@@ -1175,6 +1183,43 @@ function DashboardPage({ user, setUser }) {
     }
   }
 
+  function requestDeleteBoard(board) {
+    if (!board?.id) {
+      return;
+    }
+
+    setDeletePopupBoard({ id: board.id, title: board.title || "Untitled Board" });
+  }
+
+  function closeDeletePopup() {
+    if (deletingBoardId) {
+      return;
+    }
+
+    setDeletePopupBoard(null);
+  }
+
+  async function confirmDeleteBoard() {
+    const boardId = deletePopupBoard?.id;
+    if (!boardId) {
+      return;
+    }
+
+    setDeletingBoardId(boardId);
+    setGroupNotice("");
+
+    try {
+      await deleteBoardApi(boardId);
+      setBoards((previous) => previous.filter((board) => board.id !== boardId));
+      setDeletePopupBoard(null);
+      setGroupNotice("Board deleted.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not delete board.");
+    } finally {
+      setDeletingBoardId(null);
+    }
+  }
+
   async function signOut() {
     try {
       await fetch(`${API_ORIGIN}/auth/logout`, {
@@ -1284,6 +1329,14 @@ function DashboardPage({ user, setUser }) {
                       <h3 style={{ color: "#f4f9e9" }}>{board.title}</h3>
                       <span className="board-game-type" aria-label={`Game type: ${gameTypeLabel}`}>{gameTypeLabel}</span>
                     </div>
+                    <button
+                      className="btn btn-outline board-delete-btn"
+                      type="button"
+                      onClick={() => requestDeleteBoard(board)}
+                      disabled={deletingBoardId === board.id}
+                    >
+                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
+                    </button>
                     <div className="progress-row">
                       <span>
                         {completedGoals} of {TRACKED_GOAL_COUNT} goals complete
@@ -1730,6 +1783,30 @@ function DashboardPage({ user, setUser }) {
           </section>
         )}
       </main>
+
+      {deletePopupBoard && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeDeletePopup}>
+          <section
+            className="win-popup confirm-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deletePopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="deletePopupTitle">Delete Board?</h2>
+            <p className="win-popup-board">{deletePopupBoard.title}</p>
+            <p>This action permanently deletes the board from your dashboard and Supabase.</p>
+            <div className="confirm-popup-actions">
+              <button className="btn btn-ghost" type="button" onClick={closeDeletePopup} disabled={Boolean(deletingBoardId)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmDeleteBoard} disabled={Boolean(deletingBoardId)}>
+                {deletingBoardId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {winPopup && (
         <div className="win-popup-backdrop" role="presentation" onClick={() => setWinPopup(null)}>

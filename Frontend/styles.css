@@ -971,6 +971,24 @@ p {
   white-space: nowrap;
 }
 
+.board-delete-btn {
+  justify-self: end;
+  background: rgba(244, 249, 233, 0.16);
+  border-color: rgba(244, 249, 233, 0.72);
+  color: #f4f9e9;
+  font-size: 0.78rem;
+  padding: 0.38rem 0.62rem;
+}
+
+.board-delete-btn:hover {
+  background: rgba(244, 249, 233, 0.28);
+}
+
+.board-delete-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .progress-row {
   align-items: center;
   display: flex;
@@ -1101,6 +1119,16 @@ p {
 .win-popup .btn {
   justify-self: center;
   min-width: 130px;
+}
+
+.confirm-popup-actions {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+}
+
+.confirm-popup-actions .btn {
+  min-width: 110px;
 }
 
 .group-list {
