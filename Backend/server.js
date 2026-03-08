@@ -299,6 +299,7 @@ function requireAuth(req, res, next) {
 app.put("/api/profile/username", requireAuth, async (req, res) => {
   const userId = req.user?.id;
   const nextName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const normalizedNextName = nextName.toLowerCase();
 
   if (!userId) {
     return res.status(400).json({ error: "Authenticated user id missing." });
@@ -311,7 +312,8 @@ app.put("/api/profile/username", requireAuth, async (req, res) => {
   const { data: existingUser, error: existingErr } = await supabase
     .from("users")
     .select("id")
-    .eq("name", nextName)
+    .ilike("name", normalizedNextName)
+    .limit(1)
     .maybeSingle();
 
   if (existingErr) {
@@ -1012,7 +1014,7 @@ app.post('/auth/signup', async (req, res) => {
   const { email, username, name, password } = req.body;
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   const usernameCandidate = typeof username === 'string' && username.trim() ? username : name;
-  const normalizedUsername = typeof usernameCandidate === 'string' ? usernameCandidate.trim() : '';
+  const normalizedUsername = typeof usernameCandidate === 'string' ? usernameCandidate.trim().toLowerCase() : '';
   const hasEmailDomain = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 
   if (!normalizedEmail || !normalizedUsername || !password)
@@ -1028,7 +1030,7 @@ app.post('/auth/signup', async (req, res) => {
     return res.status(400).json({ error: 'Email already in use' });
 
   const { data: existingUsernameUser } = await supabase
-    .from('users').select('*').eq('name', normalizedUsername).maybeSingle();
+    .from('users').select('*').ilike('name', normalizedUsername).limit(1).maybeSingle();
 
   if (existingUsernameUser)
     return res.status(400).json({ error: 'Username already in use' });
@@ -1062,11 +1064,28 @@ app.post('/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Username or email and password are required' });
   }
 
-  const { data: user } = await supabase
-    .from('users')
-    .select('*')
-    .or(`email.eq.${normalizedIdentifier.toLowerCase()},name.eq.${normalizedIdentifier}`)
-    .maybeSingle();
+  const lookupByEmail = normalizedIdentifier.includes("@");
+  const usernameCandidateNormalized = normalizedIdentifier.toLowerCase();
+
+  let user = null;
+  if (lookupByEmail) {
+    const { data: emailUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', normalizedIdentifier.toLowerCase())
+      .maybeSingle();
+
+    user = emailUser || null;
+  } else {
+    const { data: usernameUser } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('name', usernameCandidateNormalized)
+      .limit(1)
+      .maybeSingle();
+
+    user = usernameUser || null;
+  }
 
   if (!user)
     return res.status(400).json({ error: 'User not found' });
