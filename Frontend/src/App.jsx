@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import volcanoLogo from "../Volcano Logo resized.png";
 
 const STORAGE_KEYS = {
   user: "bingo-battles.user",
@@ -186,7 +187,10 @@ function LandingPage({ user }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar">
-        <Link className="brand" to={brandTarget}>Bingo Battles</Link>
+        <Link className="brand" to={brandTarget}>
+          <img className="brand-logo-img" src={volcanoLogo} alt="" aria-hidden="true" />
+          <span>Bingo Battles</span>
+        </Link>
         <nav className="primary-nav auth-links" aria-label="Authentication links">
           <button className="btn btn-outline" type="button" onClick={() => navigate("/login")}>
             Log In
@@ -319,7 +323,10 @@ function AuthPage({ setUser, mode, user }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar">
-        <Link className="brand" to={brandTarget}>Bingo Battles</Link>
+        <Link className="brand" to={brandTarget}>
+          <img className="brand-logo-img" src={volcanoLogo} alt="" aria-hidden="true" />
+          <span>Bingo Battles</span>
+        </Link>
         <nav className="primary-nav auth-links" aria-label="Authentication navigation">
           <button className="btn btn-outline" type="button" onClick={() => navigate("/")}>
             About
@@ -561,7 +568,8 @@ function DashboardPage({ user, setUser }) {
       <AmbientBackground />
       <header className="topbar app-topbar dashboard-topbar">
         <Link className="brand" to="/dashboard" onClick={() => setActiveTab("dashboard")}>
-          Bingo Battles
+          <img className="brand-logo-img" src={volcanoLogo} alt="" aria-hidden="true" />
+          <span>Bingo Battles</span>
         </Link>
 
         <nav className="primary-nav" aria-label="Primary navigation">
