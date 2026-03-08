@@ -664,6 +664,79 @@ p {
   overflow-x: auto;
 }
 
+.group-leaderboard-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.group-leaderboard {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem;
+}
+
+.group-leaderboard-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  justify-content: space-between;
+}
+
+.group-leaderboard-head h2 {
+  font-size: 1.2rem;
+}
+
+.profile-groups {
+  background: var(--paper);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.profile-groups h2 {
+  font-size: 1.15rem;
+}
+
+.group-form {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.group-form-row {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr auto;
+}
+
+.group-notice {
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 700;
+  min-height: 1.2em;
+}
+
+.group-list {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.group-card {
+  background: #fffdf8;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem;
+}
+
+.group-card h3 {
+  font-size: 1rem;
+}
+
 .leaderboard-table {
   border-collapse: collapse;
   min-width: 420px;
@@ -785,6 +858,10 @@ p {
 
   .leaderboard-table {
     min-width: 340px;
+  }
+
+  .group-form-row {
+    grid-template-columns: 1fr;
   }
 
   .create-goal-grid,
