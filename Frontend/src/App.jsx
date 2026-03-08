@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import volcanoLogo from "../Volcano Logo resized.png";
+import gridIcon from "../Grid_Icon.png";
+import trophyIcon from "../Trophy_Icon.png";
+import friendsIcon from "../Friends_Icon.png";
+import volcaneSVG from "../Volcano_SVG.svg";
 
 const STORAGE_KEYS = {
   user: "bingo-battles.user",
@@ -208,21 +212,28 @@ function LandingPage({ user }) {
             <p className="hero-copy">
               Create custom Bingo boards with your personal goals, compete with friends, and watch your progress erupt.
             </p>
+            <button className="btn btn-accent btn-lg" type="button" onClick={() => navigate("/signup")}>
+              Start Your Battle
+            </button>
           </div>
+          <img className="landing-hero-volcano" src={volcaneSVG} alt="" aria-hidden="true" />
         </section>
 
         <section className="feature-grid landing-feature-grid" aria-label="Key features">
           <article className="feature-card">
+            <img src={gridIcon} alt="" aria-hidden="true" className="feature-icon" />
             <h3>Custom BINGO Boards</h3>
             <p>Create personalized Bingo boards with your unique goals and challenges.</p>
           </article>
 
           <article className="feature-card">
+            <img src={trophyIcon} alt="" aria-hidden="true" className="feature-icon" />
             <h3>Competitive Leaderboard</h3>
             <p>See how you stack up against friends and climb to the top.</p>
           </article>
 
           <article className="feature-card">
+            <img src={friendsIcon} alt="" aria-hidden="true" className="feature-icon" />
             <h3>Battle With Friends</h3>
             <p>Join groups, share your boards, and motivate each other to reach goals together.</p>
           </article>
@@ -620,7 +631,7 @@ function DashboardPage({ user, setUser }) {
                 <h2>No boards yet</h2>
                 <p>Create your first Bingo board to start tracking progress.</p>
                 <button
-                  className="btn btn-primary center-action-btn"
+                  className="btn btn-accent center-action-btn"
                   type="button"
                   onClick={() => setActiveTab("create")}
                 >
