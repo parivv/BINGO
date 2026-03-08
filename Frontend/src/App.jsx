@@ -138,13 +138,45 @@ function LandingPage({ user }) {
       </header>
 
       <main className="landing-main">
-        <section className="hero" aria-labelledby="hero-title">
+        <section className="landing-section hero" aria-labelledby="hero-title">
           <p className="eyebrow">Turn intent into action</p>
           <h1 id="hero-title">Transform your goals into an explosive challenge</h1>
           <p className="hero-copy">
             Bingo Battles helps you map your personal goals onto a board, track real progress, and stay motivated with
             friendly competition. Complete squares, raise your percentage, and race your friends on the leaderboard.
           </p>
+        </section>
+
+        <section className="landing-section" aria-labelledby="features-title">
+          <h2 id="features-title">Features</h2>
+          <div className="feature-grid">
+            <article className="feature-card">
+              <h3>Custom Boards</h3>
+              <p>Build a board around your real goals with flexible square counts and categories.</p>
+            </article>
+            <article className="feature-card">
+              <h3>Progress Tracking</h3>
+              <p>See completion percentages update as you mark goals complete.</p>
+            </article>
+            <article className="feature-card">
+              <h3>Leaderboard</h3>
+              <p>Compare momentum with friends and keep each other motivated.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="landing-section" aria-labelledby="how-title">
+          <h2 id="how-title">How It Works</h2>
+          <ol className="how-list">
+            <li>Create a custom Bingo board for your personal goals.</li>
+            <li>Track progress, mark completed goals, and watch your completion percentage rise.</li>
+            <li>Join a group and compare progress on the leaderboard.</li>
+          </ol>
+        </section>
+
+        <section className="landing-section join-now" aria-labelledby="join-title">
+          <h2 id="join-title">Join Now</h2>
+          <p>Start your first board and begin tracking your goals today.</p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-lg" type="button" onClick={() => navigate("/signup")}>
               Create Your First Board
@@ -152,21 +184,6 @@ function LandingPage({ user }) {
             <button className="btn btn-ghost btn-lg" type="button" onClick={() => navigate("/login")}>
               I Already Have an Account
             </button>
-          </div>
-        </section>
-
-        <section className="usage-panel" aria-labelledby="usage-title">
-          <h2 id="usage-title">How It Works</h2>
-          <ol>
-            <li>Create a custom Bingo board for your personal goals.</li>
-            <li>Track progress, mark completed goals, and watch your completion percentage rise.</li>
-            <li>Join a group and compare progress on the leaderboard.</li>
-          </ol>
-          <div className="mini-preview" aria-hidden="true">
-            <div className="mini-cell done">Learn 2 songs on the guitar</div>
-            <div className="mini-cell">Read 4 novels</div>
-            <div className="mini-cell done">20 consecutive pull-ups</div>
-            <div className="mini-cell">Visit a new state</div>
           </div>
         </section>
       </main>
