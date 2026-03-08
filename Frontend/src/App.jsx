@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import CreatePageRoute from "./pages/CreatePageRoute";
+import LeaderboardPageRoute from "./pages/LeaderboardPageRoute";
+import ProfilePageRoute from "./pages/ProfilePageRoute";
 import volcanoLogo from "../Volcano Logo resized.png";
 import gridIcon from "../Grid_Icon.png";
 import trophyIcon from "../Trophy_Icon.png";
@@ -44,6 +47,28 @@ const TILE_SHAPE_OPTIONS = [
   { id: "square", label: "Square" },
   { id: "circle", label: "Circle" }
 ];
+const DASHBOARD_TAB_ROUTES = {
+  dashboard: "/dashboard",
+  create: "/dashboard/create",
+  leaderboard: "/dashboard/leaderboard",
+  profile: "/dashboard/profile"
+};
+
+function getDashboardTabFromPath(pathname) {
+  if (pathname === DASHBOARD_TAB_ROUTES.create) {
+    return "create";
+  }
+
+  if (pathname === DASHBOARD_TAB_ROUTES.leaderboard) {
+    return "leaderboard";
+  }
+
+  if (pathname === DASHBOARD_TAB_ROUTES.profile) {
+    return "profile";
+  }
+
+  return "dashboard";
+}
 
 function hexToRgb(hexColor) {
   if (typeof hexColor !== "string") {
@@ -890,9 +915,10 @@ function AuthPage({ setUser, mode, user }) {
   );
 }
 
-function DashboardPage({ user, setUser }) {
+function DashboardPage({ user, setUser, initialTab = "dashboard" }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const location = useLocation();
+  const activeTab = getDashboardTabFromPath(location.pathname) || initialTab;
   const [boards, setBoards] = useState([]);
   const [createStep, setCreateStep] = useState(1);
   const [draftTitle, setDraftTitle] = useState("My 2026 Goals");
@@ -919,8 +945,20 @@ function DashboardPage({ user, setUser }) {
   const [winPopup, setWinPopup] = useState(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState(null);
+  const [hasLoadedBoards, setHasLoadedBoards] = useState(false);
+  const [editingBoard, setEditingBoard] = useState(null);
+  const [editingGoals, setEditingGoals] = useState([]);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingBoardColor, setEditingBoardColor] = useState("#c10b3c");
+  const [editingTileShape, setEditingTileShape] = useState("rounded");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  function goToTab(tabName) {
+    navigate(DASHBOARD_TAB_ROUTES[tabName] || DASHBOARD_TAB_ROUTES.dashboard);
+  }
 
   useEffect(() => {
+    setHasLoadedBoards(false);
     let isMounted = true;
 
     async function loadBoards() {
@@ -934,6 +972,10 @@ function DashboardPage({ user, setUser }) {
         if (isMounted) {
           setGroupNotice(error.message || "Could not load boards.");
         }
+      } finally {
+        if (isMounted) {
+          setHasLoadedBoards(true);
+        }
       }
     }
 
@@ -945,9 +987,13 @@ function DashboardPage({ user, setUser }) {
   }, [user.id]);
 
   useEffect(() => {
+    if (!hasLoadedBoards) {
+      return;
+    }
+
     const orderedIds = boards.map((board) => board.id);
     localStorage.setItem(getBoardOrderStorageKey(user.id), JSON.stringify(orderedIds));
-  }, [boards, user.id]);
+  }, [boards, hasLoadedBoards, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1119,7 +1165,7 @@ function DashboardPage({ user, setUser }) {
     }
 
     resetCreateDraft();
-    setActiveTab("dashboard");
+    goToTab("dashboard");
   }
 
   async function generateGoalSuggestions(mode = "all") {
@@ -1447,6 +1493,81 @@ function DashboardPage({ user, setUser }) {
     }
   }
 
+  function openEditBoard(board) {
+    if (!board?.id) return;
+    setEditingBoard(board);
+    setEditingTitle(board.title || "");
+    setEditingGoals(JSON.parse(JSON.stringify(board.goals || [])));
+    setEditingBoardColor(board.boardColor || "#c10b3c");
+    setEditingTileShape(board.tileShape || "rounded");
+  }
+
+  function closeEditBoard() {
+    setEditingBoard(null);
+    setEditingTitle("");
+    setEditingGoals([]);
+    setEditingBoardColor("#c10b3c");
+    setEditingTileShape("rounded");
+    setIsSavingEdit(false);
+  }
+
+  async function saveEditBoard() {
+    if (!editingBoard?.id || !editingTitle.trim()) {
+      setGroupNotice("Board title is required.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setGroupNotice("");
+
+    try {
+      const payload = {
+        title: editingTitle.trim(),
+        goals: editingGoals,
+        boardColor: editingBoardColor,
+        tileShape: editingTileShape,
+        gameType: editingBoard.gameType || "five-in-a-row"
+      };
+
+      const response = await fetch(`${API_ORIGIN}/api/boards/${editingBoard.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update board.");
+      }
+
+      const { board: rawBoard } = await response.json();
+      const updatedBoard = normalizeBoard(rawBoard);
+      
+      if (!updatedBoard) {
+        throw new Error("Invalid board response from server.");
+      }
+      
+      setBoards((previous) =>
+        previous.map((b) => (b.id === editingBoard.id ? updatedBoard : b))
+      );
+      closeEditBoard();
+      setGroupNotice("Board updated successfully.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not update board.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  function updateEditingGoal(index, text) {
+    const updated = [...editingGoals];
+    if (updated[index]) {
+      updated[index] = { ...updated[index], text };
+      setEditingGoals(updated);
+    }
+  }
+
   async function signOut() {
     try {
       await fetch(`${API_ORIGIN}/auth/logout`, {
@@ -1541,7 +1662,7 @@ function DashboardPage({ user, setUser }) {
     <>
       <AmbientBackground />
       <header className="topbar app-topbar dashboard-topbar">
-        <Link className="brand" to="/dashboard" onClick={() => setActiveTab("dashboard")}>
+        <Link className="brand" to="/dashboard" onClick={() => goToTab("dashboard")}>
           <img className="brand-logo-img" src={volcanoLogo} alt="" aria-hidden="true" />
           <span>Bingo Battles</span>
         </Link>
@@ -1550,28 +1671,28 @@ function DashboardPage({ user, setUser }) {
           <button
             className={`nav-link ${activeTab === "dashboard" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("dashboard")}
+            onClick={() => goToTab("dashboard")}
           >
             Dashboard
           </button>
           <button
             className={`nav-link ${activeTab === "create" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("create")}
+            onClick={() => goToTab("create")}
           >
             Create
           </button>
           <button
             className={`nav-link ${activeTab === "leaderboard" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("leaderboard")}
+            onClick={() => goToTab("leaderboard")}
           >
             Leaderboard
           </button>
           <button
             className={`nav-link ${activeTab === "profile" ? "is-active" : ""}`}
             type="button"
-            onClick={() => setActiveTab("profile")}
+            onClick={() => goToTab("profile")}
           >
             Profile
           </button>
@@ -1598,7 +1719,7 @@ function DashboardPage({ user, setUser }) {
                   type="button"
                   onClick={() => {
                     resetCreateDraft();
-                    setActiveTab("create");
+                    goToTab("create");
                   }}
                 >
                   Create a Board
@@ -1622,7 +1743,8 @@ function DashboardPage({ user, setUser }) {
                     completionPercent = 20; // Start at 20% (free space)
                   }
                 } else if (gameType === "blackout") {
-                  completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
+                  const blackoutCompleted = Math.min(FIXED_GOAL_COUNT, completedGoals + 1);
+                  completionPercent = Math.round((blackoutCompleted / FIXED_GOAL_COUNT) * 100);
                 } else {
                   completionPercent = Math.round((completedGoals / TRACKED_GOAL_COUNT) * 100);
                 }
@@ -1685,14 +1807,24 @@ function DashboardPage({ user, setUser }) {
                         </button>
                       ))}
                     </div>
-                    <button
-                      className="btn btn-outline board-delete-btn"
-                      type="button"
-                      onClick={() => requestDeleteBoard(board)}
-                      disabled={deletingBoardId === board.id}
-                    >
-                      {deletingBoardId === board.id ? "Deleting..." : "Delete Board"}
-                    </button>
+                    <div className="board-actions">
+                      <button
+                        className="btn btn-outline board-delete-btn"
+                        type="button"
+                        onClick={() => requestDeleteBoard(board)}
+                        disabled={deletingBoardId === board.id}
+                      >
+                        {deletingBoardId === board.id ? "Deleting..." : "Delete"}
+                      </button>
+                      <button
+                        className="btn btn-outline board-edit-btn"
+                        type="button"
+                        onClick={() => openEditBoard(board)}
+                        disabled={isSavingEdit}
+                      >
+                        {isSavingEdit ? "Saving..." : "Edit Design"}
+                      </button>
+                    </div>
                   </article>
                 );
               })}
@@ -2127,6 +2259,109 @@ function DashboardPage({ user, setUser }) {
         )}
       </main>
 
+      {editingBoard && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeEditBoard}>
+          <section
+            className="win-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editBoardTitle"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "500px", maxHeight: "80vh", overflowY: "auto" }}
+          >
+            <h2 id="editBoardTitle">Edit Board</h2>
+            
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveEditBoard();
+              }}
+              style={{ display: "grid", gap: "1rem" }}
+            >
+              <div style={{ display: "grid", gap: "0.6rem", gridTemplateColumns: "auto 1fr", alignItems: "center" }}>
+                <label className="field-label" htmlFor="editBoardNameInput" style={{ margin: 0, textAlign: "left" }}>
+                  Board Name
+                </label>
+                <input
+                  id="editBoardNameInput"
+                  className="field-input"
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  disabled={isSavingEdit}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="field-label">Board Color</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+                  {BOARD_COLOR_OPTIONS.map((color) => {
+                    const isSelected = editingBoardColor === color;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-option ${isSelected ? "is-selected" : ""}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setEditingBoardColor(color)}
+                        disabled={isSavingEdit}
+                        aria-label={`Select color ${color}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Tile Shape</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem" }}>
+                  {TILE_SHAPE_OPTIONS.map((shape) => {
+                    const isSelected = editingTileShape === shape.id;
+                    return (
+                      <button
+                        key={shape.id}
+                        type="button"
+                        className="btn"
+                        style={{
+                          backgroundColor: isSelected ? "var(--accent-soft)" : "var(--paper)",
+                          borderColor: "var(--stroke)",
+                          color: "var(--ink)"
+                        }}
+                        onClick={() => setEditingTileShape(shape.id)}
+                        disabled={isSavingEdit}
+                      >
+                        {shape.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: "0.5rem", gridTemplateColumns: "repeat(3, 1fr)", marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEditBoard}
+                  disabled={isSavingEdit}
+                  style={{ gridColumn: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSavingEdit}
+                  style={{ gridColumn: 3 }}
+                >
+                  {isSavingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
       {deletePopupBoard && (
         <div className="win-popup-backdrop" role="presentation" onClick={closeDeletePopup}>
           <section
@@ -2136,9 +2371,8 @@ function DashboardPage({ user, setUser }) {
             aria-labelledby="deletePopupTitle"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="deletePopupTitle">Delete Board?</h2>
-            <p className="win-popup-board">{deletePopupBoard.title}</p>
-            <p>This action permanently deletes the board from your dashboard and Supabase.</p>
+            <h2 id="deletePopupTitle">Delete {deletePopupBoard.title}?</h2>
+            <p>This action permanently deletes this board from your dashboard. Are you sure?</p>
             <div className="confirm-popup-actions">
               <button className="btn btn-ghost" type="button" onClick={closeDeletePopup} disabled={Boolean(deletingBoardId)}>
                 Cancel
@@ -2314,7 +2548,7 @@ function DashboardPage({ user, setUser }) {
   );
 }
 
-function DashboardGate({ user, setUser }) {
+function DashboardGate({ user, setUser, initialTab = "dashboard" }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -2392,7 +2626,7 @@ function DashboardGate({ user, setUser }) {
     return <Navigate to="/" replace />;
   }
 
-  return <DashboardPage user={user} setUser={setUser} />;
+  return <DashboardPage user={user} setUser={setUser} initialTab={initialTab} />;
 }
 
 function AuthLegacyRedirect() {
@@ -2412,7 +2646,10 @@ export default function App() {
       <Route path="/auth" element={<AuthLegacyRedirect />} />
       <Route path="/login" element={<AuthPage setUser={setUser} mode="login" user={user} />} />
       <Route path="/signup" element={<AuthPage setUser={setUser} mode="signup" user={user} />} />
-      <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} />} />
+      <Route path="/dashboard" element={<DashboardGate user={user} setUser={setUser} initialTab="dashboard" />} />
+      <Route path="/dashboard/create" element={<CreatePageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
+      <Route path="/dashboard/leaderboard" element={<LeaderboardPageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
+      <Route path="/dashboard/profile" element={<ProfilePageRoute user={user} setUser={setUser} DashboardGate={DashboardGate} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
