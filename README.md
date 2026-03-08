@@ -14,20 +14,20 @@ npm run install:all
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_anon_key
 SESSION_SECRET=any_long_random_string
-FRONTEND_ORIGIN=http://localhost:5173
-FRONTEND_REDIRECT=http://localhost:5173/dashboard
+FRONTEND_ORIGIN=http://localhost:3000
+FRONTEND_REDIRECT=http://localhost:3000/dashboard
 
 # Optional for Google OAuth:
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=http://localhost:5000/auth/google/callback
-PORT=5000
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+PORT=8000
 ```
 
 Optional: if your frontend should call a different backend URL, create `Frontend/.env`:
 
 ```env
-VITE_BACKEND_ORIGIN=http://localhost:5000
+VITE_BACKEND_ORIGIN=http://localhost:8000
 ```
 
 3. Start the backend.
@@ -45,5 +45,5 @@ npm run start
 5. Open the website in your browser.
 
 ```text
-http://localhost:5173
+http://localhost:3000
 ```

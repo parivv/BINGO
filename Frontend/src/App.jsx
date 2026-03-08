@@ -16,7 +16,7 @@ const STORAGE_KEYS = {
 };
 
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
-const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:5000";
+const OAUTH_BACKEND_ORIGIN = BACKEND_ORIGIN || "http://localhost:8000";
 const API_ORIGIN = OAUTH_BACKEND_ORIGIN;
 const APP_BASE = import.meta.env.BASE_URL || "/";
 const APP_BASE_PREFIX = APP_BASE.endsWith("/") ? APP_BASE.slice(0, -1) : APP_BASE;
@@ -486,7 +486,7 @@ function AuthPage({ setUser, mode, user }) {
       setUser(nextUser);
       navigate("/dashboard");
     } catch (_error) {
-      const target = API_ORIGIN || "Vite proxy -> http://localhost:5000";
+      const target = API_ORIGIN || "Vite proxy -> http://localhost:8000";
       setError(`Cannot reach backend via ${target}. Make sure backend is running.`);
     }
   }

@@ -5,9 +5,10 @@ export default defineConfig(({ mode }) => ({
   base: mode === "development" ? "/" : "/BINGO/",
   plugins: [react()],
   server: {
+    port: 3000,
     proxy: {
-      "/auth": "http://localhost:5000",
-      "/api": "http://localhost:5000"
+      "/auth": "http://localhost:8000",
+      "/api": "http://localhost:8000"
     }
   }
 }));
