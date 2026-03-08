@@ -957,6 +957,20 @@ p {
   text-transform: lowercase;
 }
 
+.footer-copy {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.1rem;
+}
+
+.footer-volcano-gif {
+  display: block;
+  height: 4.6em;
+  object-fit: cover;
+  object-position: center;
+  width: 3.25em;
+}
+
 .tm-symbol {
   font-family: "Segoe UI Symbol", "Arial Unicode MS", "Segoe UI", sans-serif;
   font-size: 0.7em;
