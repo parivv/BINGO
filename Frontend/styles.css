@@ -1150,6 +1150,19 @@ p {
   font-size: 1rem;
 }
 
+.group-delete-btn {
+  justify-self: start;
+  background: rgba(193, 11, 60, 0.08);
+  border-color: rgba(193, 11, 60, 0.35);
+  color: var(--accent);
+  font-size: 0.82rem;
+  padding: 0.32rem 0.6rem;
+}
+
+.group-delete-btn:hover {
+  background: rgba(193, 11, 60, 0.16);
+}
+
 .leaderboard-table {
   border-collapse: collapse;
   min-width: 420px;

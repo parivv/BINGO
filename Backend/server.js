@@ -452,6 +452,53 @@ app.post("/api/groups/join", requireAuth, async (req, res) => {
   return res.json({ group, joined: true });
 });
 
+app.delete("/api/groups/:groupId", requireAuth, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Authenticated user id missing." });
+  }
+
+  const { data: group, error: groupError } = await supabase
+    .from("groups")
+    .select("id, owner_user_id")
+    .eq("id", groupId)
+    .maybeSingle();
+
+  if (groupError) {
+    return res.status(500).json({ error: groupError.message });
+  }
+
+  if (!group) {
+    return res.status(404).json({ error: "Group not found." });
+  }
+
+  if (group.owner_user_id !== userId) {
+    return res.status(403).json({ error: "Only the group owner can delete this group." });
+  }
+
+  const { error: memberDeleteError } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId);
+
+  if (memberDeleteError) {
+    return res.status(500).json({ error: memberDeleteError.message });
+  }
+
+  const { error: groupDeleteError } = await supabase
+    .from("groups")
+    .delete()
+    .eq("id", groupId);
+
+  if (groupDeleteError) {
+    return res.status(500).json({ error: groupDeleteError.message });
+  }
+
+  return res.json({ success: true, groupId });
+});
+
 app.put("/api/groups/:groupId/assignment", requireAuth, async (req, res) => {
   const { groupId } = req.params;
   const userId = req.user?.id;

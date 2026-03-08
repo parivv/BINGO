@@ -380,6 +380,12 @@ async function createGroupApi(name) {
   return normalizeGroup(payload.group);
 }
 
+async function deleteGroupApi(groupId) {
+  await apiRequest(`/api/groups/${groupId}`, {
+    method: "DELETE"
+  });
+}
+
 async function joinGroupApi(code) {
   const payload = await apiRequest("/api/groups/join", {
     method: "POST",
@@ -783,6 +789,8 @@ function DashboardPage({ user, setUser }) {
   const [draftTileShape, setDraftTileShape] = useState("rounded");
   const [deletingBoardId, setDeletingBoardId] = useState(null);
   const [deletePopupBoard, setDeletePopupBoard] = useState(null);
+  const [deletingGroupId, setDeletingGroupId] = useState(null);
+  const [deletePopupGroup, setDeletePopupGroup] = useState(null);
   const [winPopup, setWinPopup] = useState(null);
 
   useEffect(() => {
@@ -1101,6 +1109,49 @@ function DashboardPage({ user, setUser }) {
       setJoinCode("");
     } catch (error) {
       setGroupNotice(error.message || "Could not join group.");
+    }
+  }
+
+  function requestDeleteGroup(group) {
+    if (!group?.id) {
+      return;
+    }
+
+    setDeletePopupGroup({ id: group.id, name: group.name || "Untitled Group" });
+  }
+
+  function closeDeleteGroupPopup() {
+    if (deletingGroupId) {
+      return;
+    }
+
+    setDeletePopupGroup(null);
+  }
+
+  async function confirmDeleteGroup() {
+    const groupId = deletePopupGroup?.id;
+    if (!groupId) {
+      return;
+    }
+
+    setDeletingGroupId(groupId);
+    setGroupNotice("");
+
+    try {
+      await deleteGroupApi(groupId);
+      setGroups((previous) => previous.filter((group) => group.id !== groupId));
+      setGroupLeaderboards((previous) => previous.filter((group) => group.id !== groupId));
+      setAssignmentDraftByGroup((previous) => {
+        const next = { ...previous };
+        delete next[groupId];
+        return next;
+      });
+      setDeletePopupGroup(null);
+      setGroupNotice("Group deleted.");
+    } catch (error) {
+      setGroupNotice(error.message || "Could not delete group.");
+    } finally {
+      setDeletingGroupId(null);
     }
   }
 
@@ -1773,6 +1824,17 @@ function DashboardPage({ user, setUser }) {
                     <p>
                       Current assignment: <strong>{getBoardTitle(assignedBoardId)}</strong>
                     </p>
+
+                    {group.ownerId === user.id && (
+                      <button
+                        className="btn btn-outline group-delete-btn"
+                        type="button"
+                        onClick={() => requestDeleteGroup(group)}
+                        disabled={deletingGroupId === group.id}
+                      >
+                        {deletingGroupId === group.id ? "Deleting..." : "Delete Group"}
+                      </button>
+                    )}
                         </>
                       );
                     })()}
@@ -1802,6 +1864,30 @@ function DashboardPage({ user, setUser }) {
               </button>
               <button className="btn btn-primary" type="button" onClick={confirmDeleteBoard} disabled={Boolean(deletingBoardId)}>
                 {deletingBoardId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deletePopupGroup && (
+        <div className="win-popup-backdrop" role="presentation" onClick={closeDeleteGroupPopup}>
+          <section
+            className="win-popup confirm-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deleteGroupPopupTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="deleteGroupPopupTitle">Delete Group?</h2>
+            <p className="win-popup-board">{deletePopupGroup.name}</p>
+            <p>This permanently deletes the group and removes all memberships from Supabase.</p>
+            <div className="confirm-popup-actions">
+              <button className="btn btn-ghost" type="button" onClick={closeDeleteGroupPopup} disabled={Boolean(deletingGroupId)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmDeleteGroup} disabled={Boolean(deletingGroupId)}>
+                {deletingGroupId ? "Deleting..." : "Delete"}
               </button>
             </div>
           </section>
