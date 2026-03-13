@@ -1,5 +1,13 @@
 # Bingo Battles
 
+Create personalized Bingo boards with your unique goals and challenges.
+See how you stack up against friends and climb to the top.
+Join groups, share your boards, and motivate each other to reach goals together.
+
+#Website:
+https://parivv.github.io/BINGO
+
+
 ## How to run locally
 
 1. Install dependencies.
