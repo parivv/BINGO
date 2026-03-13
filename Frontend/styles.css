@@ -1216,6 +1216,12 @@ p {
   min-width: 110px;
 }
 
+.username-edit-form {
+  display: grid;
+  gap: 0.7rem;
+  text-align: left;
+}
+
 .group-list {
   display: grid;
   gap: 0.8rem;
